@@ -1,0 +1,86 @@
+{
+  "MarketInformation": {
+    "BrandName": "",
+    "Indication": "",
+    "ApprovedFor": "",
+    "ApprovedCountries": [],
+    "ApprovedDate": "",
+    "GenericName": "",
+    "GenericApprovedDate": "",
+    "PotentialGenericAvailability": "",
+    "SpecialStatus": "",
+    "PatentExclusivityInfo": ""
+  },
+  "DrugSubstancePhysicalAndChemicalProperties": {
+    "ChemicalStructure": "",
+    "PotencyClassification": "",
+    "ElementalFormula": "",
+    "BCSClass": "",
+    "MolecularWeight": "",
+    "AverageIsotopicMass": "",
+    "IUPACName": "",
+    "Solubility": ""
+  },
+  "DrugSubstanceProcessDevelopment": {
+    "AvailableDMFvendors": [],
+    "PotencyClassification": "",
+    "ManufacturingSite": "",
+    "ManufacturingRoute": "",
+    "PolymorphStudies": "",
+    "RegulatoryStartingMaterials": [],
+    "RSMandIntermediateSpecifications": "",
+    "DrugSubstanceSpecifications": "",
+    "ImpurityQualification": "",
+    "GenotoxicImpuritiesAssessment": "",
+    "NitrosaminesAssessment": "",
+    "FateOfImpuritiesStudies": "",
+    "CPPsAndCQAStudies": "",
+    "OtherInformationReagentsAndSolventsGrade": ""
+  },
+  "DrugSubstanceAnalyticalDevelopment": {
+    "RSMMethods": "",
+    "IPCTestMethods": "",
+    "FinalAPIMethods": "",
+    "ResidualSolventRiskAssessment": "",
+    "RSMSynthesis": "",
+    "StabilityOfDrugSubstance": ""
+  },
+  "DrugSubstanceAgencyFeedback": {
+    "CurrentVendorFeedback": ""
+  },
+  "DrugProductInformation": {
+    "DosageForms": [],
+    "Strength": "",
+    "TargetPopulation": "",
+    "MaximumDailyDose": "",
+    "DevelopmentProgramDesignation": "",
+    "StorageAndShippingConditions": ""
+  },
+  "DrugProductFormulation": {
+    "FormulationComposition": "",
+    "InactiveIngredients": [
+      {
+        "IngredientName": "",
+        "%w/w": ""
+      }
+    ],
+    "MaximumDailyDose": "",
+    "UnmetClinicalNeedWithDosageForm": "",
+    "DPManufacturingProcess": "",
+    "DPExcipientsGrade": "",
+    "DPImpuritiesAndProcessImpurities": "",
+    "DPSpecification": "",
+    "DPTestMethods": "",
+    "ResidualSolventsRiskAssessment": "",
+    "NitrosamineRiskAssessment": "",
+    "StabilityStudies": "",
+    "PackagingMaterial": "",
+    "Presentation": "",
+    "DOE_CPP_CQA_CMA": "",
+    "DissolutionStudies": "",
+    "FoodStudyReports": "",
+    "CurrentLabel": "",
+    "DPEmbossingDebossing": ""
+  },
+  "References": []
+}
