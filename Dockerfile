@@ -1,17 +1,15 @@
-# Use official Python base image
-FROM python:3.12
+FROM python:3.12-slim
 
-# Copy project files
-COPY . .
+WORKDIR /app
 
-# Set working directory
-WORKDIR /
+# Copy requirements first (so Docker caches it)
+COPY requirements.txt .
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose port
-EXPOSE 8000
+# Copy the rest of your app
+COPY . .
 
-# Start FastAPI app
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Command to run FastAPI
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

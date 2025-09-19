@@ -2,21 +2,27 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, EmailStr, validator
 from typing import List
 import re
-from passlib.context import CryptContext
 
 app = FastAPI()
 
 # In-memory storage
 users_db: List[dict] = []
 
-# Password hashing setup
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 # --- User Models ---
 class UserRegister(BaseModel):
     name: str
     email: EmailStr
     password: str
+
+    @validator("email")
+    def validate_email(cls, value):
+        # Must end with .com
+        if not value.endswith(".com"):
+            raise ValueError("Email must end with .com")
+        # No spaces allowed
+        if " " in value:
+            raise ValueError("Email must not contain spaces")
+        return value
 
     @validator("password")
     def validate_password(cls, value):
@@ -36,13 +42,6 @@ class UserLogin(BaseModel):
     username_or_email: str
     password: str
 
-# --- Helper functions ---
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
-
 # --- Endpoints ---
 @app.post("/register")
 def register_user(user: UserRegister):
@@ -51,15 +50,14 @@ def register_user(user: UserRegister):
         if u["email"] == user.email:
             raise HTTPException(status_code=400, detail="Email already registered")
 
-    hashed_pw = hash_password(user.password)
-    users_db.append({"name": user.name, "email": user.email, "password": hashed_pw})
+    users_db.append({"name": user.name, "email": user.email, "password": user.password})
     return {"message": "User registered successfully"}
 
 @app.post("/login")
 def login(user: UserLogin):
     for u in users_db:
         if u["email"] == user.username_or_email or u["name"] == user.username_or_email:
-            if verify_password(user.password, u["password"]):
+            if user.password == u["password"]:  # direct comparison
                 return {
                     "message": "Login successful",
                     "user": {"name": u["name"], "email": u["email"]}
