@@ -1,28 +1,55 @@
-from fastapi import FastAPI, HTTPException
+# app/main.py
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, EmailStr, validator
-from typing import List
+from motor.motor_asyncio import AsyncIOMotorClient
+from passlib.context import CryptContext
+from jose import jwt, JWTError, ExpiredSignatureError
+from datetime import datetime, timedelta
 import re
+from typing import Optional
 
-app = FastAPI()
+# --- App setup ---
+app = FastAPI(title="ChemBank Auth API")
 
-# In-memory storage
-users_db: List[dict] = []
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- Database setup ---
+MONGO_URL = "mongodb://chembank-mongo:27017"
+client = AsyncIOMotorClient(MONGO_URL)
+db = client["chembank"]
+
+# --- Password hashing ---
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+# --- JWT configuration ---
+SECRET_KEY = "your_secret_key_here"  # Change in production
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 # --- User Models ---
 class UserRegister(BaseModel):
     name: str
     email: EmailStr
     password: str
-
-    @validator("email")
-    def validate_email(cls, value):
-        # Must end with .com
-        if not value.endswith(".com"):
-            raise ValueError("Email must end with .com")
-        # No spaces allowed
-        if " " in value:
-            raise ValueError("Email must not contain spaces")
-        return value
 
     @validator("password")
     def validate_password(cls, value):
@@ -39,29 +66,56 @@ class UserRegister(BaseModel):
         return value
 
 class UserLogin(BaseModel):
-    username_or_email: str
+    email: EmailStr
     password: str
+
+# --- OAuth2 setup ---
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+        
+        user = await db.users.find_one({"email": email})
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        return user
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 # --- Endpoints ---
 @app.post("/register")
-def register_user(user: UserRegister):
-    # Check if email already exists
-    for u in users_db:
-        if u["email"] == user.email:
-            raise HTTPException(status_code=400, detail="Email already registered")
+async def register_user(user: UserRegister):
+    existing_user = await db.users.find_one({"email": user.email})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
 
-    users_db.append({"name": user.name, "email": user.email, "password": user.password})
+    user_dict = {
+        "name": user.name,
+        "email": user.email,
+        "password": hash_password(user.password)
+    }
+    await db.users.insert_one(user_dict)
     return {"message": "User registered successfully"}
 
 @app.post("/login")
-def login(user: UserLogin):
-    for u in users_db:
-        if u["email"] == user.username_or_email or u["name"] == user.username_or_email:
-            if user.password == u["password"]:  # direct comparison
-                return {
-                    "message": "Login successful",
-                    "user": {"name": u["name"], "email": u["email"]}
-                }
-            else:
-                raise HTTPException(status_code=401, detail="Invalid username/email or password")
-    raise HTTPException(status_code=401, detail="Invalid username/email or password")
+async def login_user(user: UserLogin):
+    db_user = await db.users.find_one({"email": user.email})
+    if not db_user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    if not verify_password(user.password, db_user["password"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    access_token = create_access_token(data={"sub": db_user["email"]})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.get("/me")
+async def read_current_user(current_user: dict = Depends(get_current_user)):
+    return {"name": current_user["name"], "email": current_user["email"]}
