@@ -19,13 +19,6 @@ async def root():
     return {"message": "MongoDB is connected"}
 
 
-# ---------------- USERS ----------------
-@app.post("/user")
-async def create_user(user: Users):
-    result = await db.users.insert_one(user.dict())
-    return {"inserted_id": str(result.inserted_id)}
-
-
 # ---------------- DRUGS ----------------
 
 # Create (requires full schema)

@@ -110,8 +110,3 @@ class DrugRecord(BaseModel):
     DrugProduct: DrugProduct
     References: List[str] = Field(default_factory=list)
 
-
-# ---------------- Users ----------------
-class Users(BaseModel):
-    username: str
-    password: str
