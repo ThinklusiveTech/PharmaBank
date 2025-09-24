@@ -1,3 +1,12 @@
+<<<<<<< HEAD
+
+from motor.motor_asyncio import AsyncIOMotorClient
+
+MONGO_URI = "mongodb://chembank-mongo:27017"  # This will point to the MongoDB service in Docker
+client = AsyncIOMotorClient(MONGO_URI)
+db = client["chembank"]
+
+=======
 from motor.motor_asyncio import AsyncIOMotorClient
 
 <<<<<<< HEAD
@@ -16,3 +25,4 @@ db = client["chembank"]
 users_collection = db["users"]
 drugs_collection = db["drugs"]
 >>>>>>> origin/main
+>>>>>>> main
