@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 FROM python:3.12-slim
 
 # Set working directory
@@ -25,4 +26,22 @@ COPY . .
 EXPOSE 8000
 
 # Run FastAPI with uvicorn
+=======
+# Use official Python base image
+FROM python:3.12
+
+# Copy project files
+COPY . .
+
+# Set working directory
+WORKDIR /
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Expose port
+EXPOSE 8000
+
+# Start FastAPI app
+>>>>>>> main
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
