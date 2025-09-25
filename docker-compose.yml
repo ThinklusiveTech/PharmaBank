@@ -16,6 +16,9 @@ services:
       - "8000:8000"
     depends_on:
       - mongo
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
-  mongo-data:
+  mongo-data: {}

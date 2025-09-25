@@ -1,28 +1,26 @@
-<<<<<<< HEAD
-
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import ServerSelectionTimeoutError
+import logging
+import os
 
-MONGO_URI = "mongodb://chembank-mongo:27017"  # This will point to the MongoDB service in Docker
-client = AsyncIOMotorClient(MONGO_URI)
-db = client["chembank"]
+# ---------------- Configuration ----------------
+MONGO_HOST = os.getenv("MONGO_HOST", "chembank-mongo")  # Docker service name
+MONGO_PORT = os.getenv("MONGO_PORT", "27017")
+MONGO_DB = os.getenv("MONGO_DB", "chembank")
 
-=======
-from motor.motor_asyncio import AsyncIOMotorClient
+DB_URL = f"mongodb://{MONGO_HOST}:{MONGO_PORT}"
 
-<<<<<<< HEAD
-# Local MongoDB connection (no TLS needed)
-DB_URL ="mongodb://chembank-mongo:27017"
+# ---------------- Client Setup ----------------
+try:
+    client = AsyncIOMotorClient(DB_URL, serverSelectionTimeoutMS=5000)
+    db = client[MONGO_DB]
 
+    # Optional: expose collections
+    users_collection = db["users"]
+    drugs_collection = db["drugs"]
 
-client = AsyncIOMotorClient(DB_URL)
-db = client["chembank"]  # database name "chembank"
-=======
-MONGO_URI = "mongodb://mongo:27017"  # This will point to the MongoDB service in Docker
-client = AsyncIOMotorClient(MONGO_URI)
-db = client["chembank"]
+    logging.info(f"✅ Connected to MongoDB at {DB_URL}, database: {MONGO_DB}")
 
-# Optional: expose collections
-users_collection = db["users"]
-drugs_collection = db["drugs"]
->>>>>>> origin/main
->>>>>>> main
+except ServerSelectionTimeoutError as e:
+    logging.error(f"❌ Could not connect to MongoDB: {e}")
+    raise
