@@ -1,14 +1,15 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
 from bson import ObjectId
 from typing import Optional, List
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, validator
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from fastapi.responses import JSONResponse
+import re
 
 from database import db
-from models import DrugData, Users
+from models import DrugData
 
 app = FastAPI()
 
@@ -79,8 +80,23 @@ async def root():
 # ---------------- USER ROUTES ----------------
 class UserCreate(BaseModel):
     name: str
-    email: str
+    email: EmailStr
     password: str
+
+    # Password validation
+    @validator("password")
+    def password_strength(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not re.search(r"[0-9]", v):
+            raise ValueError("Password must contain at least one number")
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
+            raise ValueError("Password must contain at least one special character")
+        return v
 
 
 @app.post("/register", response_model=dict)
@@ -96,7 +112,6 @@ async def register_user(user: UserCreate):
     return {"user": user_helper(created_user), "message": "User registered successfully"}
 
 
-# ---------------- LOGIN (JSON-based) ----------------
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -108,7 +123,7 @@ async def login(request: LoginRequest):
     if not user or not verify_password(request.password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    access_token = create_access_token({"sub": user["email"]})
+    access_token = create_access_token({"sub": user["email"]}, expires_delta=timedelta(minutes=60))
     return {"access_token": access_token, "token_type": "bearer"}
 
 
