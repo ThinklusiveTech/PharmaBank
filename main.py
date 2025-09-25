@@ -1,11 +1,11 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
 from bson import ObjectId
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
-from pydantic import BaseModel, EmailStr
+from fastapi.responses import JSONResponse
 
 from database import db
 from models import DrugData, Users
@@ -101,6 +101,7 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+
 @app.post("/login", response_model=dict)
 async def login(request: LoginRequest):
     user = await db.users.find_one({"email": request.email})
@@ -109,6 +110,7 @@ async def login(request: LoginRequest):
 
     access_token = create_access_token({"sub": user["email"]})
     return {"access_token": access_token, "token_type": "bearer"}
+
 
 # ---------------- DRUG ROUTES ----------------
 class DrugResponse(BaseModel):
@@ -180,3 +182,28 @@ async def delete_drug(drug_id: str, user: dict = Depends(get_current_user)):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Drug not found")
     return {"message": "Drug deleted successfully"}
+
+
+# ---------------- GET CURRENT LOGGED-IN USER ----------------
+@app.get("/me", response_model=dict)
+async def get_me(authorization: str = Header(None)):
+    """
+    Get currently logged-in user's data with structured error messages
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        return JSONResponse(status_code=401, content={"error": "Missing or invalid Authorization header"})
+    
+    token = authorization.split(" ")[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            return JSONResponse(status_code=401, content={"error": "Invalid token: missing subject"})
+    except JWTError as e:
+        return JSONResponse(status_code=401, content={"error": f"Invalid token: {str(e)}"})
+
+    user = await db.users.find_one({"email": email})
+    if not user:
+        return JSONResponse(status_code=404, content={"error": "User not found"})
+
+    return {"user": user_helper(user)}
