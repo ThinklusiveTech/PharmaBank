@@ -1,168 +1,148 @@
-<<<<<<< HEAD
-# app/main.py
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer
-from pydantic import BaseModel, EmailStr, validator
-from motor.motor_asyncio import AsyncIOMotorClient
+from fastapi import FastAPI, HTTPException, Depends, Header
+from bson import ObjectId
+from typing import Optional, List
+from pydantic import BaseModel, Field, EmailStr
 from passlib.context import CryptContext
-from jose import jwt, JWTError, ExpiredSignatureError
 from datetime import datetime, timedelta
-import re
-from typing import Optional
+from jose import jwt, JWTError
+from fastapi.responses import JSONResponse
 
-# --- App setup ---
-app = FastAPI(title="ChemBank Auth API")
+from database import db
+from models import DrugData, Users
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI()
 
-# --- Database setup ---
-MONGO_URL = "mongodb://chembank-mongo:27017"
-client = AsyncIOMotorClient(MONGO_URL)
-db = client["chembank"]
+# ---------------- Security Config ----------------
+SECRET_KEY = "super_secret_key_change_me"  # 🔐 Use env var in production
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-# --- Password hashing ---
+# Passlib bcrypt context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+
+# ---------------- Helpers ----------------
+def drug_helper(drug) -> dict:
+    """Convert MongoDB _id to str for response"""
+    drug["_id"] = str(drug["_id"])
+    return drug
+
+
+def user_helper(user) -> dict:
+    """Convert MongoDB user to safe response (remove password)"""
+    user["_id"] = str(user["_id"])
+    user.pop("password", None)
+    return user
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
-# --- JWT configuration ---
-SECRET_KEY = "your_secret_key_here"  # Change in production
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-# --- User Models ---
-class UserRegister(BaseModel):
-    name: str
-    email: EmailStr
-    password: str
 
-    @validator("password")
-    def validate_password(cls, value):
-        if len(value) < 8:
-            raise ValueError("Password must be at least 8 characters long")
-        if not re.search(r"[A-Z]", value):
-            raise ValueError("Password must contain at least one uppercase letter")
-        if not re.search(r"[a-z]", value):
-            raise ValueError("Password must contain at least one lowercase letter")
-        if not re.search(r"\d", value):
-            raise ValueError("Password must contain at least one number")
-        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", value):
-            raise ValueError("Password must contain at least one special character")
-        return value
+async def get_current_user(authorization: str = Header(None)):
+    """Extract and validate JWT from Authorization header"""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
 
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
-# --- OAuth2 setup ---
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
-
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+    token = authorization.split(" ")[1]
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
-            raise HTTPException(status_code=401, detail="Invalid token payload")
-        
-        user = await db.users.find_one({"email": email})
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
-        
-        return user
-    except ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
+            raise HTTPException(status_code=401, detail="Invalid token")
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-# --- Endpoints ---
-@app.post("/register")
-async def register_user(user: UserRegister):
-    existing_user = await db.users.find_one({"email": user.email})
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    user_dict = {
-        "name": user.name,
-        "email": user.email,
-        "password": hash_password(user.password)
-    }
-    await db.users.insert_one(user_dict)
-    return {"message": "User registered successfully"}
-
-@app.post("/login")
-async def login_user(user: UserLogin):
-    db_user = await db.users.find_one({"email": user.email})
-    if not db_user:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-    if not verify_password(user.password, db_user["password"]):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-    access_token = create_access_token(data={"sub": db_user["email"]})
-    return {"access_token": access_token, "token_type": "bearer"}
-
-@app.get("/me")
-async def read_current_user(current_user: dict = Depends(get_current_user)):
-    return {"name": current_user["name"], "email": current_user["email"]}
-=======
-from fastapi import FastAPI, HTTPException
-from bson import ObjectId
-from models import DrugRecord, Users
-from database import db
-from typing import Optional
-from pydantic import BaseModel
-
-app = FastAPI()
-
-# ---------------- Helpers ----------------
-def drug_helper(drug) -> dict:
-    drug["_id"] = str(drug["_id"])
-    return drug
+    user = await db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user_helper(user)
 
 
 # ---------------- Root ----------------
-@app.get("/")
+@app.get("/", response_model=dict)
 async def root():
     return {"message": "MongoDB is connected"}
 
 
-# ---------------- DRUGS ----------------
+# ---------------- USER ROUTES ----------------
+class UserCreate(BaseModel):
+    name: str
+    email: str
+    password: str
 
-# Create (requires full schema)
-@app.post("/drugs/")
-async def create_drug(drug: DrugRecord):
+
+@app.post("/register", response_model=dict)
+async def register_user(user: UserCreate):
+    existing_user = await db.users.find_one({"email": user.email})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    hashed_password = get_password_hash(user.password)
+    user_dict = {"name": user.name, "email": user.email, "password": hashed_password}
+    result = await db.users.insert_one(user_dict)
+    created_user = await db.users.find_one({"_id": result.inserted_id})
+    return {"user": user_helper(created_user), "message": "User registered successfully"}
+
+
+# ---------------- LOGIN (JSON-based) ----------------
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+@app.post("/login", response_model=dict)
+async def login(request: LoginRequest):
+    user = await db.users.find_one({"email": request.email})
+    if not user or not verify_password(request.password, user["password"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    access_token = create_access_token({"sub": user["email"]})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+# ---------------- DRUG ROUTES ----------------
+class DrugResponse(BaseModel):
+    id: str = Field(..., alias="_id")
+    MarketInformation: Optional[dict] = None
+    DrugSubstance: Optional[dict] = None
+    DrugProduct: Optional[dict] = None
+    References: Optional[List[dict]] = None
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
+@app.post("/drugs/", response_model=DrugResponse)
+async def create_drug(drug: DrugData, user: dict = Depends(get_current_user)):
     result = await db.drugs.insert_one(drug.dict())
-    return {"inserted_id": str(result.inserted_id)}
+    created_drug = await db.drugs.find_one({"_id": result.inserted_id})
+    return drug_helper(created_drug)
 
 
-# Read All
-@app.get("/drugs/")
-async def get_all_drugs():
+@app.get("/drugs/", response_model=List[DrugResponse])
+async def get_all_drugs(skip: int = 0, limit: int = 10, user: dict = Depends(get_current_user)):
     drugs = []
-    async for drug in db.drugs.find():
+    cursor = db.drugs.find().skip(skip).limit(limit)
+    async for drug in cursor:
         drugs.append(drug_helper(drug))
     return drugs
 
 
-# Read One
-@app.get("/drugs/{drug_id}")
-async def get_drug(drug_id: str):
+@app.get("/drugs/{drug_id}", response_model=DrugResponse)
+async def get_drug(drug_id: str, user: dict = Depends(get_current_user)):
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid ID")
     drug = await db.drugs.find_one({"_id": ObjectId(drug_id)})
@@ -171,43 +151,59 @@ async def get_drug(drug_id: str):
     return drug_helper(drug)
 
 
-# Update (allows partial updates)
-class DrugRecordUpdate(BaseModel):
+class DrugUpdate(BaseModel):
     MarketInformation: Optional[dict] = None
     DrugSubstance: Optional[dict] = None
     DrugProduct: Optional[dict] = None
-    References: Optional[list] = None
+    References: Optional[List[dict]] = None
 
 
-@app.put("/drugs/{drug_id}")
-async def update_drug(drug_id: str, updated_drug: DrugRecordUpdate):
+@app.put("/drugs/{drug_id}", response_model=MessageResponse)
+async def update_drug(drug_id: str, updated_drug: DrugUpdate, user: dict = Depends(get_current_user)):
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid ID")
 
-    update_data = {
-        k: v for k, v in updated_drug.dict(exclude_unset=True).items() if v is not None
-    }
-
+    update_data = {k: v for k, v in updated_drug.dict(exclude_unset=True).items() if v is not None}
     if not update_data:
         raise HTTPException(status_code=400, detail="No valid fields to update")
 
-    result = await db.drugs.update_one(
-        {"_id": ObjectId(drug_id)}, {"$set": update_data}
-    )
-
+    result = await db.drugs.update_one({"_id": ObjectId(drug_id)}, {"$set": update_data})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Drug not found")
 
     return {"message": "Drug updated successfully"}
 
 
-# Delete
-@app.delete("/drugs/{drug_id}")
-async def delete_drug(drug_id: str):
+@app.delete("/drugs/{drug_id}", response_model=MessageResponse)
+async def delete_drug(drug_id: str, user: dict = Depends(get_current_user)):
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid ID")
     result = await db.drugs.delete_one({"_id": ObjectId(drug_id)})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Drug not found")
     return {"message": "Drug deleted successfully"}
->>>>>>> main
+
+
+# ---------------- GET CURRENT LOGGED-IN USER ----------------
+@app.get("/me", response_model=dict)
+async def get_me(authorization: str = Header(None)):
+    """
+    Get currently logged-in user's data with structured error messages
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        return JSONResponse(status_code=401, content={"error": "Missing or invalid Authorization header"})
+    
+    token = authorization.split(" ")[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            return JSONResponse(status_code=401, content={"error": "Invalid token: missing subject"})
+    except JWTError as e:
+        return JSONResponse(status_code=401, content={"error": f"Invalid token: {str(e)}"})
+
+    user = await db.users.find_one({"email": email})
+    if not user:
+        return JSONResponse(status_code=404, content={"error": "User not found"})
+
+    return {"user": user_helper(user)}

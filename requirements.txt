@@ -13,12 +13,11 @@ sniffio==1.3.1
 starlette==0.47.2
 typing-inspection==0.4.1
 typing_extensions==4.14.1
-uvicorn==0.35.0
-<<<<<<< HEAD
-python-dotenv
-passlib[bcrypt]
+uvicorn[standard]==0.37.0
+python-dotenv==1.0.0
+passlib>=1.7.4,<2
+bcrypt>=4.0.0
 email-validator==2.0.0
-python-jose==3.3.0
+python-jose[cryptography]==3.3.0
 python-multipart==0.0.9
-=======
->>>>>>> main
+PyJWT==2.8.0
