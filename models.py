@@ -87,6 +87,7 @@ class DrugData(BaseModel):
     doe_cpp_cqa_cma: Optional[str]
     dissolution_studies: Optional[str]
     food_study_reports: Optional[str]
+    
     current_label: Optional[str]
     dp_embossing_debossing: Optional[str]
 
