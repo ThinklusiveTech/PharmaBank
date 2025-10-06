@@ -12,6 +12,26 @@ from database import db
 
 app = FastAPI()
 
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI()
+
+# Allow frontend origins
+origins = [
+    "http://localhost:3000",          # local React dev
+    "http://127.0.0.1:3000",
+    "https://cmcintel.com",           # your frontend production domain
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,            # Allow specific origins
+    allow_credentials=True,
+    allow_methods=["*"],              # Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],              # Allow all headers
+)
+
+
 # ---------------- Security Config ----------------
 SECRET_KEY = "super_secret_key_change_me"  # 🔐 Use env var in production
 ALGORITHM = "HS256"
