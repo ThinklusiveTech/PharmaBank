@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from fastapi.responses import JSONResponse
 
-from models import DrugData, Users
+from models import DrugData, Users, ForgotPasswordRequest
 from database import db
 
 app = FastAPI()
@@ -18,7 +18,7 @@ app = FastAPI()
 
 # Allow frontend origins
 origins = [
-    "http://localhost:3000",          # local React dev
+    "http://localhost:3004",          # local React dev
     "http://127.0.0.1:3000",
     "https://cmcintel.com",           # your frontend production domain
 ]
@@ -116,6 +116,28 @@ async def login(request: LoginRequest):
 
     access_token = create_access_token({"sub": user["email"]})
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.post("/forgot-password", response_model=dict)
+async def forgot_password(request: ForgotPasswordRequest):
+    # Check if user exists
+    user = await db.users.find_one({"email": request.email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    #  Hash new password
+    hashed_password = get_password_hash(request.new_password)
+
+    #  Update user password in DB
+    result = await db.users.update_one(
+        {"email": request.email},          # Filter: find the user by email
+        {"$set": {"password": hashed_password}}  # Update: set new hashed password
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to update password")
+
+    return {"message": "Password updated successfully"}
 
 # ---------------- DRUG ROUTES ----------------
 class DrugResponse(DrugData):

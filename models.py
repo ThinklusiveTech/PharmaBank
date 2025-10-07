@@ -6,6 +6,9 @@ class Users(BaseModel):
     email: str
     password: str
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+    new_password: str
 
 class InactiveIngredient(BaseModel):
     ingredient_name: str
