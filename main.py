@@ -1,12 +1,14 @@
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
 from bson import ObjectId
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.hash import bcrypt
-from typing import Optional
+from typing import Optional, List
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr
+from bson.errors import InvalidId
+
 
 # ---------------- Config ----------------
 SECRET_KEY = "super_secret_key_change_me"
@@ -18,7 +20,6 @@ MONGO_URI = "mongodb://chembank-mongo:27017"
 client = AsyncIOMotorClient(MONGO_URI)
 db = client["chembank"]
 users_collection = db["users"]
-drugs_collection = db["drugs"]
 
 # ---------------- FastAPI App ----------------
 app = FastAPI(title="ChemBank API")
@@ -60,6 +61,11 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+def require_admin(user: dict = Depends(get_current_user)):
+    if "roles" not in user or "admin" not in user["roles"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
 # ---------------- Pydantic Models ----------------
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -69,6 +75,7 @@ class Users(BaseModel):
     name: str
     email: EmailStr
     password: str
+    roles: Optional[List[str]] = ["user"]  # default role is "user"
 
 # ---------------- Root ----------------
 @app.get("/")
@@ -76,7 +83,7 @@ async def root():
     return {"message": "MongoDB is connected"}
 
 # ---------------- Register User ----------------
-@app.post("/users/register")
+@app.post("/register")
 async def register_user(user: Users):
     existing_user = await users_collection.find_one({"email": user.email})
     if existing_user:
@@ -95,8 +102,8 @@ async def register_user(user: Users):
         "user_details": new_user
     }
 
-# ---------------- Login (Token + User Details) ----------------
-@app.post("/token")
+# ---------------- Login ----------------
+@app.post("/login")
 async def login_for_access_token(form_data: LoginRequest):
     user = await users_collection.find_one({"email": form_data.email})
     if not user or not bcrypt.verify(form_data.password, user["password"]):
@@ -104,23 +111,39 @@ async def login_for_access_token(form_data: LoginRequest):
 
     access_token = create_access_token(data={"sub": user["email"]})
 
-    # Return token + user details (exclude password)
     user_data = {
         "id": str(user["_id"]),
         "name": user["name"],
-        "email": user["email"]
+        "email": user["email"],
+        "roles": user.get("roles", ["user"])
     }
 
     return {
-        "message": "Login successful",
+        "message": " User Login successfully",
         "access_token": access_token,
         "token_type": "bearer",
         "user": user_data
     }
 
-# ---------------- Get All Registered Users ----------------
-@app.get("/get_all_usersdetails")
-async def read_all_users(current_user: dict = Depends(get_current_user)):
+# ---------------- Get All Users OR Specific User by ID ----------------
+@app.get("/allusersdetails")
+async def read_users(user_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    # If a specific user ID is provided
+    if user_id:
+        if not ObjectId.is_valid(user_id):
+            raise HTTPException(status_code=400, detail="Invalid user ID format")
+
+        user = await users_collection.find_one({"_id": ObjectId(user_id)}, {"password": 0})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        user["_id"] = str(user["_id"])
+        return {
+            "message": "User details found",
+            "user": user
+        }
+
+    # Otherwise return all users
     users_cursor = users_collection.find({}, {"password": 0})
     all_users = []
     async for usr in users_cursor:
@@ -148,3 +171,15 @@ async def get_user_by_id(user_id: str, current_user: dict = Depends(get_current_
         "message": "User details found",
         "user": user
     }
+# ---------------- Delete User by ID ----------------
+@app.delete("/users/{user_id}")
+async def delete_user(user_id: str, current_user: dict = Depends(get_current_user)):
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+
+    result = await users_collection.delete_one({"_id": ObjectId(user_id)})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {"message": f"User with ID {user_id} deleted successfully"}
