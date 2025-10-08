@@ -1,18 +1,22 @@
+version: "3.9"
+
 services:
+  chembank-api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      - chembank-mongo
+
   chembank-mongo:
-    image: mongo:7.0
-    container_name: chembank-mongo
+    image: mongo:7
+    restart: always
     ports:
       - "27017:27017"
     volumes:
-      - mongo_data:/data/db
-
-  chembank-api:
-    build: .
-    depends_on:
-      - chembank-mongo
-    ports:
-      - "8000:8000"
+      - mongo-data:/data/db
 
 volumes:
-  mongo_data:
+  mongo-data:
