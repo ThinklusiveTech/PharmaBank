@@ -7,6 +7,9 @@ class Users(BaseModel):
     password: str
     roles: Optional[List[str]] = ["user"]
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+    new_password: str
 
 class LoginRequest(BaseModel):
     email: str

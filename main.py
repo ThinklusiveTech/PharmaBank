@@ -17,9 +17,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+
 # Allow frontend origins
 origins = [
-    "http://localhost:3000",          # local React dev
+    "http://localhost:3004",          # local React dev
     "http://127.0.0.1:3000",
     "https://cmcintel.com",           # your frontend production domain
 ]
@@ -96,95 +97,11 @@ async def get_current_user(authorization: str = Header(None)):
 async def root():
     return {"message": "MongoDB is connected"}
 
-# ---------------- USER ROUTES ----------------
-@app.post("/register", response_model=dict)
-async def register_user(user: Users):
-    """Register a new user"""
-    existing_user = await db.users.find_one({"email": user.email})
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
 
-    hashed_password = get_password_hash(user.password)
-    user_dict = {"name": user.name, "email": user.email, "password": hashed_password}
-    result = await db.users.insert_one(user_dict)
-    created_user = await db.users.find_one({"_id": result.inserted_id})
-    return {"user": user_helper(created_user), "message": "User registered successfully"}
+# Import routes so FastAPI registers them
+import login
+import drug
 
-class LoginRequest(BaseModel):
-    email: str
-    password: str
 
-@app.post("/login", response_model=dict)
-async def login(request: LoginRequest):
-    """Login user and return JWT"""
-    user = await db.users.find_one({"email": request.email})
-    if not user or not verify_password(request.password, user["password"]):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    access_token = create_access_token({"sub": user["email"]})
-    return {"access_token": access_token, "token_type": "bearer"}
 
-# ---------------- DRUG ROUTES ----------------
-class DrugResponse(DrugData):
-    id: str = Field(..., alias="_id")
-
-class MessageResponse(BaseModel):
-    message: str
-
-@app.post("/drugs/", response_model=DrugResponse)
-async def create_drug(drug: DrugData, user: dict = Depends(get_current_user)):
-    result = await db.drugs.insert_one(drug.dict())
-    created_drug = await db.drugs.find_one({"_id": result.inserted_id})
-    return drug_helper(created_drug)
-
-@app.get("/drugs/", response_model=List[DrugResponse])
-async def get_all_drugs(skip: int = 0, limit: int = 10, user: dict = Depends(get_current_user)):
-    drugs = []
-    cursor = db.drugs.find().skip(skip).limit(limit)
-    async for drug in cursor:
-        drugs.append(drug_helper(drug))
-    return drugs
-
-@app.get("/drugs/{drug_id}", response_model=DrugResponse)
-async def get_drug(drug_id: str, user: dict = Depends(get_current_user)):
-    if not ObjectId.is_valid(drug_id):
-        raise HTTPException(status_code=400, detail="Invalid ID")
-    drug = await db.drugs.find_one({"_id": ObjectId(drug_id)})
-    if not drug:
-        raise HTTPException(status_code=404, detail="Drug not found")
-    return drug_helper(drug)
-
-class DrugUpdate(BaseModel):
-    MarketInformation: Optional[dict] = None
-    DrugSubstance: Optional[dict] = None
-    DrugProduct: Optional[dict] = None
-    References: Optional[List[dict]] = None
-
-@app.put("/drugs/{drug_id}", response_model=MessageResponse)
-async def update_drug(drug_id: str, updated_drug: DrugUpdate, user: dict = Depends(get_current_user)):
-    if not ObjectId.is_valid(drug_id):
-        raise HTTPException(status_code=400, detail="Invalid ID")
-
-    update_data = {k: v for k, v in updated_drug.dict(exclude_unset=True).items() if v is not None}
-    if not update_data:
-        raise HTTPException(status_code=400, detail="No valid fields to update")
-
-    result = await db.drugs.update_one({"_id": ObjectId(drug_id)}, {"$set": update_data})
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Drug not found")
-
-    return {"message": "Drug updated successfully"}
-
-@app.delete("/drugs/{drug_id}", response_model=MessageResponse)
-async def delete_drug(drug_id: str, user: dict = Depends(get_current_user)):
-    if not ObjectId.is_valid(drug_id):
-        raise HTTPException(status_code=400, detail="Invalid ID")
-    result = await db.drugs.delete_one({"_id": ObjectId(drug_id)})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Drug not found")
-    return {"message": "Drug deleted successfully"}
-
-# ---------------- GET CURRENT LOGGED-IN USER ----------------
-@app.get("/me", response_model=dict)
-async def get_me(user: dict = Depends(get_current_user)):
-    return {"user": user}
