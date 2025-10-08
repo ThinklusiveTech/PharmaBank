@@ -5,7 +5,12 @@ class Users(BaseModel):
     name: str
     email: str
     password: str
+    roles: Optional[List[str]] = ["user"]
 
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 class InactiveIngredient(BaseModel):
     ingredient_name: str

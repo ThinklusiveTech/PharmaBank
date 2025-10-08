@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import OAuth2PasswordBearer
 from bson import ObjectId
 from typing import Optional, List
 from pydantic import BaseModel, Field
@@ -74,8 +75,14 @@ async def get_current_user(authorization: str = Header(None)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
-        if email is None:
+        if not email:
             raise HTTPException(status_code=401, detail="Invalid token")
+        user = await users_collection.find_one({"email": email})
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        user["_id"] = str(user["_id"])
+        user.pop("password", None)
+        return user
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
@@ -85,7 +92,7 @@ async def get_current_user(authorization: str = Header(None)):
     return user_helper(user)
 
 # ---------------- Root ----------------
-@app.get("/", response_model=dict)
+@app.get("/")
 async def root():
     return {"message": "MongoDB is connected"}
 
