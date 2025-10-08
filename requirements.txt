@@ -2,19 +2,19 @@
 fastapi==0.116.1
 uvicorn[standard]==0.37.0
 starlette==0.47.2
-
+ 
 # MongoDB Async Driver
 motor==3.7.1
 pymongo==4.14.1
 dnspython==2.7.0
-
+ 
 # Pydantic & Typing
 pydantic==2.11.7
 pydantic_core==2.33.2
 typing-inspection==0.4.1
 typing_extensions==4.14.1
 annotated-types==0.7.0
-
+ 
 # Security / Auth
 passlib[bcrypt]==1.7.4
 bcrypt==4.1.2
@@ -22,7 +22,7 @@ python-jose[cryptography]==3.3.0
 PyJWT==2.8.0
 email-validator==2.0.0
 python-multipart==0.0.9
-
+ 
 # Utilities
 anyio==4.10.0
 h11==0.16.0
