@@ -3,12 +3,13 @@ from pydantic import BaseModel
 from models import Users, ForgotPasswordRequest
 from database import db
 from jwt_handler import create_access_token
-from hashing import get_password_hash, verify_password
+from hashing import get_password_hash
 from main import app
 from typing import Optional
-from jwt_handler import get_current_user
+from jwt_handler import get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 from bson import ObjectId
-from handlers import user_helper
+from datetime import timedelta
+from hashing import bcrypt
 
 
 
@@ -17,32 +18,64 @@ class LoginRequest(BaseModel):
     password: str
 
 
-
-# ---------------- USER ROUTES ----------------
-@app.post("/register", response_model=dict)
+ 
+# ---------------- Register User ----------------
+@app.post("/register")
 async def register_user(user: Users):
-    """Register a new user"""
     existing_user = await db.users.find_one({"email": user.email})
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
-
-    hashed_password = get_password_hash(user.password)
-    user_dict = {"name": user.name, "email": user.email, "password": hashed_password}
+    hashed_password = bcrypt.hash(user.password)
+    user_dict = user.dict()
+    user_dict["password"] = hashed_password
     result = await db.users.insert_one(user_dict)
-    created_user = await db.users.find_one({"_id": result.inserted_id})
-    return {"user": user_helper(created_user), "message": "User registered successfully"}
-
-
-
-@app.post("/login", response_model=dict)
-async def login(request: LoginRequest):
-    """Login user and return JWT"""
-    user = await db.users.find_one({"email": request.email})
-    if not user or not verify_password(request.password, user["password"]):
+    new_user = await db.users.find_one({"_id": result.inserted_id}, {"password": 0})
+    new_user["_id"] = str(new_user["_id"])
+    return {"message": "User registered successfully", "user_details": new_user}
+ 
+# ---------------- Login ----------------
+@app.post("/login")
+async def login_for_access_token(form_data: LoginRequest):
+    user = await db.users.find_one({"email": form_data.email})
+    if not user or not bcrypt.verify(form_data.password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    access_token = create_access_token(
+        data={"sub": user["email"]},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    user_data = {
+        "id": str(user["_id"]),
+        "name": user["name"],
+        "email": user["email"],
+        "roles": user.get("roles", ["admin"])
+    }
+    return {"message": "User Login successfully", "access_token": access_token, "token_type": "bearer", "user": user_data}
 
-    access_token = create_access_token({"sub": user["email"]})
-    return {"access_token": access_token, "token_type": "bearer"}
+# # ---------------- USER ROUTES ----------------
+# @app.post("/register", response_model=dict)
+# async def register_user(user: Users):
+#     """Register a new user"""
+#     existing_user = await db.users.find_one({"email": user.email})
+#     if existing_user:
+#         raise HTTPException(status_code=400, detail="Email already registered")
+
+#     hashed_password = get_password_hash(user.password)
+#     user_dict = {"name": user.name, "email": user.email, "password": hashed_password}
+#     result = await db.users.insert_one(user_dict)
+#     created_user = await db.users.find_one({"_id": result.inserted_id})
+#     return {"user": user_helper(created_user), "message": "User registered successfully"}
+
+
+
+# @app.post("/login", response_model=dict)
+# async def login(request: LoginRequest):
+#     """Login user and return JWT"""
+#     user = await db.users.find_one({"email": request.email})
+#     if not user or not verify_password(request.password, user["password"]):
+#         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+#     access_token = create_access_token({"sub": user["email"]})
+#     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/forgot-password", response_model=dict)
 async def forgot_password(request: ForgotPasswordRequest):
