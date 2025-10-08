@@ -3,7 +3,7 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
 from database import db
-from login import user_helper
+from handlers import user_helper
 
 
 # ---------------- Security Config ----------------

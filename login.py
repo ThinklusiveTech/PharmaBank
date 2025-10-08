@@ -8,6 +8,7 @@ from main import app
 from typing import Optional
 from jwt_handler import get_current_user
 from bson import ObjectId
+from handlers import user_helper
 
 
 
@@ -15,12 +16,6 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
-
-def user_helper(user) -> dict:
-    """Convert MongoDB user to safe response (remove password)"""
-    user["_id"] = str(user["_id"])
-    user.pop("password", None)
-    return user
 
 
 # ---------------- USER ROUTES ----------------
