@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from login import login_router
+from drug import drug_router
 
 app = FastAPI()
 
@@ -17,10 +19,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(login_router)
+app.include_router(drug_router)
+
 @app.get("/", response_model=dict)
 async def root():
-    return {"message": "MongoDB is connected"}
-
-# Import routes so FastAPI registers them
-import login
-import drug
+    return {"message": "ChemBank API is running"}
