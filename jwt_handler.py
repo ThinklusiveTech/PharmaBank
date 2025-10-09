@@ -1,13 +1,13 @@
-from fastapi import HTTPException, Header 
+import os
+from fastapi import HTTPException, Header
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
 from database import db
 from handlers import user_helper
 
-
 # ---------------- Security Config ----------------
-SECRET_KEY = "super_secret_key_change_me"  # 🔐 Use env var in production
+SECRET_KEY = os.getenv("SECRET_KEY", "super_secret_key_change_me")  # 🔐 Use env var in production
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 

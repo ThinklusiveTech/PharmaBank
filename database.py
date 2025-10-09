@@ -19,9 +19,7 @@ try:
     client = AsyncIOMotorClient(DB_URL, serverSelectionTimeoutMS=5000)
     db = client[MONGO_DB]
 
-    # Optional: expose commonly used collections
-    users_collection = db["users"]
-    drugs_collection = db["drugs"]
+    # Database connection established
 
     logging.info(f"✅ Connected to MongoDB at {DB_URL}, database: {MONGO_DB}")
 

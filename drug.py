@@ -1,11 +1,11 @@
-from fastapi import  HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends
 from bson import ObjectId
 from typing import Optional, List
 from models import DrugData
 from database import db
 from pydantic import BaseModel, Field
-from main import app
-from jwt_handler import get_current_user
+
+drug_router = APIRouter()
 
 class DrugUpdate(BaseModel):
     MarketInformation: Optional[dict] = None
@@ -26,13 +26,15 @@ class DrugResponse(DrugData):
 class MessageResponse(BaseModel):
     message: str
 
-@app.post("/drugs/", response_model=DrugResponse)
+from jwt_handler import get_current_user
+
+@drug_router.post("/drugs/", response_model=DrugResponse)
 async def create_drug(drug: DrugData, user: dict = Depends(get_current_user)):
     result = await db.drugs.insert_one(drug.dict())
     created_drug = await db.drugs.find_one({"_id": result.inserted_id})
     return drug_helper(created_drug)
 
-@app.get("/drugs/", response_model=List[DrugResponse])
+@drug_router.get("/drugs/", response_model=List[DrugResponse])
 async def get_all_drugs(skip: int = 0, limit: int = 10, user: dict = Depends(get_current_user)):
     drugs = []
     cursor = db.drugs.find().skip(skip).limit(limit)
@@ -40,7 +42,7 @@ async def get_all_drugs(skip: int = 0, limit: int = 10, user: dict = Depends(get
         drugs.append(drug_helper(drug))
     return drugs
 
-@app.get("/drugs/{drug_id}", response_model=DrugResponse)
+@drug_router.get("/drugs/{drug_id}", response_model=DrugResponse)
 async def get_drug(drug_id: str, user: dict = Depends(get_current_user)):
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid ID")
@@ -49,9 +51,7 @@ async def get_drug(drug_id: str, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Drug not found")
     return drug_helper(drug)
 
-
-
-@app.put("/drugs/{drug_id}", response_model=MessageResponse)
+@drug_router.put("/drugs/{drug_id}", response_model=MessageResponse)
 async def update_drug(drug_id: str, updated_drug: DrugUpdate, user: dict = Depends(get_current_user)):
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid ID")
@@ -66,7 +66,7 @@ async def update_drug(drug_id: str, updated_drug: DrugUpdate, user: dict = Depen
 
     return {"message": "Drug updated successfully"}
 
-@app.delete("/drugs/{drug_id}", response_model=MessageResponse)
+@drug_router.delete("/drugs/{drug_id}", response_model=MessageResponse)
 async def delete_drug(drug_id: str, user: dict = Depends(get_current_user)):
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid ID")
