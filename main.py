@@ -1,13 +1,18 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import ProxyHeadersMiddleware
 from login import login_router
 from drug import drug_router
 
 app = FastAPI()
 
+# Add proxy headers middleware to handle HTTPS behind reverse proxy
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
+
 origins = [
     "http://localhost:3004",
     "http://127.0.0.1:3000",
+    "https://localhost:3004",
     "https://cmcintel.com",
 ]
 
