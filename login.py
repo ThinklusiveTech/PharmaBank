@@ -107,3 +107,4 @@ async def delete_user(user_id: str, current_user: dict = Depends(get_current_use
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
     return {"message": f"User with ID {user_id} deleted successfully"}
+
