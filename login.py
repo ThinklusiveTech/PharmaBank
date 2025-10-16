@@ -27,7 +27,7 @@ async def register_user(user: Users):
     result = await db.users.insert_one(user_dict)
     new_user = await db.users.find_one({"_id": result.inserted_id}, {"password": 0})
     new_user["_id"] = str(new_user["_id"])
-    return {"message": "User registered successfully", "user_details": new_user}
+    return {"message": "User registered successfully", "data": new_user}
 
 # ---------------- Login ----------------
 @login_router.post("/login")
@@ -45,7 +45,7 @@ async def login_for_access_token(form_data: LoginRequest):
         "email": user["email"],
         "roles": user.get("roles", ["admin"])
     }
-    return {"message": "User Login successfully", "access_token": access_token, "token_type": "bearer", "user": user_data}
+    return {"message": "User Login successfully", "access_token": access_token,  "data": user_data}
 
 @login_router.post("/forgot-password")
 async def forgot_password(request: ForgotPasswordRequest):
@@ -78,14 +78,14 @@ async def read_users(user_id: Optional[str] = None, current_user: dict = Depends
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         user["_id"] = str(user["_id"])
-        return {"message": "User details found", "user": user}
+        return {"message": "User details found", "data": user}
 
     users_cursor = db.users.find({}, {"password": 0})
     all_users = []
     async for usr in users_cursor:
         usr["_id"] = str(usr["_id"])
         all_users.append(usr)
-    return {"message": "All registered users", "total_users": len(all_users), "users": all_users}
+    return {"message": "All registered users", "total_users": len(all_users), "data": all_users}
 
 # ---------------- Get User by ID ----------------
 @login_router.get("/user/{user_id}")
@@ -96,7 +96,7 @@ async def get_user_by_id(user_id: str, current_user: dict = Depends(get_current_
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     user["_id"] = str(user["_id"])
-    return {"message": "User details found", "user": user}
+    return {"message": "User details found", "data": user}
 
 # ---------------- Delete User by ID ----------------
 @login_router.delete("/user/{user_id}")
