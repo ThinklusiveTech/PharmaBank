@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from bson import ObjectId
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from models import DrugData
 from database import db
 from pydantic import BaseModel, Field
@@ -15,18 +15,24 @@ class DrugUpdate(BaseModel):
     appendices: Optional[dict] = None
     references: Optional[List[dict]] = None
 
+# ---------------- Response Models ----------------
+class DrugResponse(BaseModel):
+    message: str
+    data: Dict[str, Any]
+
+class DrugListResponse(BaseModel):
+    message: str
+    total_drugs: int
+    data: List[Dict[str, Any]]
+
+class MessageResponse(BaseModel):
+    message: str
+
 # ---------------- Helpers ----------------
 def drug_helper(drug) -> dict:
     """Convert MongoDB _id to str for response"""
     drug["_id"] = str(drug["_id"])
     return drug
-
-# ---------------- DRUG ROUTES ----------------
-class DrugResponse(DrugData):
-    id: str = Field(..., alias="_id")
-
-class MessageResponse(BaseModel):
-    message: str
 
 from jwt_handler import get_current_user
 
@@ -53,15 +59,15 @@ async def create_drug(drug: DrugData, user: dict = Depends(get_current_user)):
 
     result = await db.drugs.insert_one(drug_data)
     created_drug = await db.drugs.find_one({"_id": result.inserted_id})
-    return {"message": "Drug created successfully", "data": drug_helper(created_drug)}
+    return DrugResponse(message="Drug created successfully", data=drug_helper(created_drug))
 
-@drug_router.get("/drugs/", response_model=List[DrugResponse])
+@drug_router.get("/drugs/", response_model=DrugListResponse)
 async def get_all_drugs(skip: int = 0, limit: int = 10, user: dict = Depends(get_current_user)):
     drugs = []
     cursor = db.drugs.find().skip(skip).limit(limit)
     async for drug in cursor:
         drugs.append(drug_helper(drug))
-    return {"message": "Drugs retrieved successfully", "total_drugs": len(drugs), "data": drugs}
+    return DrugListResponse(message="Drugs retrieved successfully", total_drugs=len(drugs), data=drugs)
 
 @drug_router.get("/drugs/{drug_id}", response_model=DrugResponse)
 async def get_drug(drug_id: str, user: dict = Depends(get_current_user)):
@@ -70,7 +76,7 @@ async def get_drug(drug_id: str, user: dict = Depends(get_current_user)):
     drug = await db.drugs.find_one({"_id": ObjectId(drug_id)})
     if not drug:
         raise HTTPException(status_code=404, detail="Drug not found")
-    return {"message": "Drug retrieved successfully", "data": drug_helper(drug)}
+    return DrugResponse(message="Drug retrieved successfully", data=drug_helper(drug))
 
 @drug_router.put("/drugs/{drug_id}", response_model=MessageResponse)
 async def update_drug(drug_id: str, updated_drug: DrugUpdate, user: dict = Depends(get_current_user)):
@@ -184,7 +190,7 @@ async def update_drug(drug_id: str, updated_drug: DrugUpdate, user: dict = Depen
 
     # Fetch the updated drug
     updated_drug = await db.drugs.find_one({"_id": ObjectId(drug_id)})
-    return {"message": "Drug updated successfully", "data": drug_helper(updated_drug)}
+    return DrugResponse(message="Drug updated successfully", data=drug_helper(updated_drug))
 
 @drug_router.delete("/drugs/{drug_id}", response_model=MessageResponse)
 async def delete_drug(drug_id: str, user: dict = Depends(get_current_user)):
