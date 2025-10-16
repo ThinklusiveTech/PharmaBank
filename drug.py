@@ -53,7 +53,7 @@ async def create_drug(drug: DrugData, user: dict = Depends(get_current_user)):
 
     result = await db.drugs.insert_one(drug_data)
     created_drug = await db.drugs.find_one({"_id": result.inserted_id})
-    return drug_helper(created_drug)
+    return {"message": "Drug created successfully", "data": drug_helper(created_drug)}
 
 @drug_router.get("/drugs/", response_model=List[DrugResponse])
 async def get_all_drugs(skip: int = 0, limit: int = 10, user: dict = Depends(get_current_user)):
@@ -61,7 +61,7 @@ async def get_all_drugs(skip: int = 0, limit: int = 10, user: dict = Depends(get
     cursor = db.drugs.find().skip(skip).limit(limit)
     async for drug in cursor:
         drugs.append(drug_helper(drug))
-    return drugs
+    return {"message": "Drugs retrieved successfully", "total_drugs": len(drugs), "data": drugs}
 
 @drug_router.get("/drugs/{drug_id}", response_model=DrugResponse)
 async def get_drug(drug_id: str, user: dict = Depends(get_current_user)):
@@ -70,7 +70,7 @@ async def get_drug(drug_id: str, user: dict = Depends(get_current_user)):
     drug = await db.drugs.find_one({"_id": ObjectId(drug_id)})
     if not drug:
         raise HTTPException(status_code=404, detail="Drug not found")
-    return drug_helper(drug)
+    return {"message": "Drug retrieved successfully", "data": drug_helper(drug)}
 
 @drug_router.put("/drugs/{drug_id}", response_model=MessageResponse)
 async def update_drug(drug_id: str, updated_drug: DrugUpdate, user: dict = Depends(get_current_user)):
@@ -182,7 +182,9 @@ async def update_drug(drug_id: str, updated_drug: DrugUpdate, user: dict = Depen
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Drug not found")
 
-    return {"message": "Drug updated successfully"}
+    # Fetch the updated drug
+    updated_drug = await db.drugs.find_one({"_id": ObjectId(drug_id)})
+    return {"message": "Drug updated successfully", "data": drug_helper(updated_drug)}
 
 @drug_router.delete("/drugs/{drug_id}", response_model=MessageResponse)
 async def delete_drug(drug_id: str, user: dict = Depends(get_current_user)):
@@ -191,4 +193,4 @@ async def delete_drug(drug_id: str, user: dict = Depends(get_current_user)):
     result = await db.drugs.delete_one({"_id": ObjectId(drug_id)})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Drug not found")
-    return {"message": "Drug deleted successfully"}
+    return {"message": f"Drug with ID {drug_id} deleted successfully"}
