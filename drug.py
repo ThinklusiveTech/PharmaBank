@@ -8,13 +8,12 @@ from pydantic import BaseModel, Field
 drug_router = APIRouter()
 
 class DrugUpdate(BaseModel):
-    cid: Optional[str] = None
-    version: Optional[str] = None
-    marketInformation: Optional[dict] = None
-    drugSubstance: Optional[dict] = None
-    drugProduct: Optional[dict] = None
-    appendices: Optional[dict] = None
-    references: Optional[List[dict]] = None
+    cid: Optional[Any] = None
+    marketInformation: Optional[Any] = None
+    drugSubstance: Optional[Any] = None
+    drugProduct: Optional[Any] = None
+    appendices: Optional[Any] = None
+    references: Optional[Any] = None
 
 # ---------------- Response Models ----------------
 class DrugResponse(BaseModel):
@@ -39,24 +38,20 @@ from jwt_handler import get_current_user
 
 @drug_router.post("/drugs/", response_model=DrugResponse)
 async def create_drug(drug: DrugData, user: dict = Depends(get_current_user)):
+    drug_data = drug.dict()
+
     # Auto-generate CID if not provided
-    if not drug.cid:
+    if not drug_data.get("cid"):
         # Generate CID like D001, D002, etc.
         last_drug = await db.drugs.find_one(sort=[("cid", -1)])
         if last_drug and last_drug.get("cid"):
             try:
                 last_num = int(last_drug["cid"][1:])  # Extract number after 'D'
-                drug.cid = f"D{last_num + 1:03d}"
+                drug_data["cid"] = f"D{last_num + 1:03d}"
             except (ValueError, IndexError):
-                drug.cid = "D001"
+                drug_data["cid"] = "D001"
         else:
-            drug.cid = "D001"
-
-    drug_data = drug.dict()
-    # Filter out default "string" values to prevent saving placeholder data
-    for field, value in drug_data.items():
-        if value == "string":
-            drug_data[field] = None
+            drug_data["cid"] = "D001"
 
     result = await db.drugs.insert_one(drug_data)
     created_drug = await db.drugs.find_one({"_id": result.inserted_id})
@@ -79,7 +74,7 @@ async def get_drug(drug_id: str, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Drug not found")
     return DrugResponse(message="Drug retrieved successfully", data=drug_helper(drug))
 
-@drug_router.put("/drugs/{drug_id}", response_model=MessageResponse)
+@drug_router.put("/drugs/{drug_id}", response_model=DrugResponse)
 async def update_drug(drug_id: str, updated_drug: DrugUpdate, user: dict = Depends(get_current_user)):
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid ID")
@@ -192,8 +187,8 @@ async def update_drug(drug_id: str, updated_drug: DrugUpdate, user: dict = Depen
         raise HTTPException(status_code=404, detail="Drug not found")
 
     # Fetch the updated drug
-    updated_drug = await db.drugs.find_one({"_id": ObjectId(drug_id)})
-    return DrugResponse(message="Drug updated successfully", data=drug_helper(updated_drug))
+    updated_drug_doc = await db.drugs.find_one({"_id": ObjectId(drug_id)})
+    return DrugResponse(message="Drug updated successfully", data=drug_helper(updated_drug_doc))
 
 @drug_router.delete("/drugs/{drug_id}", response_model=MessageResponse)
 async def delete_drug(drug_id: str, user: dict = Depends(get_current_user)):
