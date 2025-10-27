@@ -25,6 +25,7 @@ class Reference(BaseModel):
 
 class DrugData(BaseModel):
     cid: Optional[str] = None
+    version: Optional[str] = None
     brand_name: Optional[str] = None
     indication: Optional[str] = None
     approved_for: Optional[str] = None

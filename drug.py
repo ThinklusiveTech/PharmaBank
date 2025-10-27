@@ -9,6 +9,7 @@ drug_router = APIRouter()
 
 class DrugUpdate(BaseModel):
     cid: Optional[str] = None
+    version: Optional[str] = None
     marketInformation: Optional[dict] = None
     drugSubstance: Optional[dict] = None
     drugProduct: Optional[dict] = None
@@ -175,6 +176,8 @@ async def update_drug(drug_id: str, updated_drug: DrugUpdate, user: dict = Depen
     # Handle direct fields
     if updated_drug.cid is not None:
         update_data["cid"] = updated_drug.cid
+    if updated_drug.version is not None:
+        update_data["version"] = updated_drug.version
     if updated_drug.references is not None:
         update_data["references"] = updated_drug.references
 
