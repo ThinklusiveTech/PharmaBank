@@ -36,7 +36,7 @@ async def login_for_access_token(form_data: LoginRequest):
     if not user or not verify_password(form_data.password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     access_token = create_access_token(
-        data={"sub": user["email"]},
+        data={"sub": str(user["_id"])},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     user_data = {
