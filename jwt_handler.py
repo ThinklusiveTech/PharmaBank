@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 from database import db
 from handlers import user_helper
+from bson import ObjectId
+
 
 # ---------------- Security Config ----------------
 SECRET_KEY = os.getenv("SECRET_KEY", "super_secret_key_change_me")  # 🔐 Use env var in production
@@ -27,13 +29,13 @@ async def get_current_user(authorization: str = Header(None)):
     token = authorization.split(" ")[1]
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
+        user_id: str = payload.get("sub")
+        if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token")
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    user = await db.users.find_one({"email": email})
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return user_helper(user)

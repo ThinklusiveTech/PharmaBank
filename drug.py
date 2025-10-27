@@ -8,12 +8,12 @@ from pydantic import BaseModel, Field
 drug_router = APIRouter()
 
 class DrugUpdate(BaseModel):
-    cid: Optional[str] = None
-    marketInformation: Optional[dict] = None
-    drugSubstance: Optional[dict] = None
-    drugProduct: Optional[dict] = None
-    appendices: Optional[dict] = None
-    references: Optional[List[dict]] = None
+    cid: Optional[Any] = None
+    marketInformation: Optional[Any] = None
+    drugSubstance: Optional[Any] = None
+    drugProduct: Optional[Any] = None
+    appendices: Optional[Any] = None
+    references: Optional[Any] = None
 
 # ---------------- Response Models ----------------
 class DrugResponse(BaseModel):

@@ -24,9 +24,9 @@ class Reference(BaseModel):
     url: str
 
 class DrugData(BaseModel):
-    cid: Optional[str] = None
-    marketInformation: Optional[Dict[str, Any]] = None
-    drugSubstance: Optional[Dict[str, Any]] = None
-    drugProduct: Optional[Dict[str, Any]] = None
-    appendices: Optional[Dict[str, Any]] = None
-    references: Optional[List[Dict[str, Any]]] = None
+    cid: Optional[Any] = None
+    marketInformation: Optional[Any] = None
+    drugSubstance: Optional[Any] = None
+    drugProduct: Optional[Any] = None
+    appendices: Optional[Any] = None
+    references: Optional[Any] = None
