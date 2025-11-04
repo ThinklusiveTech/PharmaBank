@@ -12,8 +12,8 @@ app = FastAPI()
 environment = os.getenv("ENVIRONMENT", "development")
 if environment == "production":
     origins = [
-        "https://cmcintel.com",  # Replace with your actual frontend domain
-        "https://cmcintel.com/v1",  # Include www if applicable
+        "https://cmcintel.com",
+        "http://localhost:3004",  # Allow localhost for testing
     ]
 else:
     origins = ["*"]  # Allow all origins in development
@@ -26,9 +26,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(login_router)
-app.include_router(drug_router)
-app.include_router(bookmark_router)
+app.include_router(login_router, prefix="/v1")
+app.include_router(drug_router, prefix="/v1")
+app.include_router(bookmark_router, prefix="/v1")
 
 @app.get("/", response_model=dict)
 async def root():

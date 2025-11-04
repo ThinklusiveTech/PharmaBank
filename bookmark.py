@@ -9,7 +9,7 @@ bookmark_router = APIRouter()
 
 # ---------------- Request Models ----------------
 class BookmarkRequest(BaseModel):
-    drug_id: str
+    drugId: str
 
 # ---------------- Response Models ----------------
 class BookmarkResponse(BaseModel):
@@ -34,7 +34,7 @@ def drug_helper(drug) -> dict:
 
 @bookmark_router.post("/bookmarks/", response_model=BookmarkResponse)
 async def bookmark_drug(request: BookmarkRequest, user: dict = Depends(get_current_user)):
-    drug_id = request.drug_id
+    drug_id = request.drugId
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid drug ID")
 
