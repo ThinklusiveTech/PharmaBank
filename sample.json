@@ -16,7 +16,7 @@
   "drugSubstance": {
     "physicalAndChemicalProperties": {
       "chemicalName": "Crizotinib",
-      "chemicalStructure": "See media/image1.png",
+      "chemicalStructure": "https://i.ibb.co/x8FdDyhk/chemicalstructure.jpg",
       "potencyClassification": "",
       "elementalFormula": "C21H22Cl2FN5O",
       "bcsClass": "Class IV (low solubility and low permeability)",
@@ -385,23 +385,23 @@
       "labels": [
         {
           "label": "250 mg Capsule Bottle",
-          "image": "image2"
+          "image": "https://i.ibb.co/zhMZ4vvw/xalkori-200.jpg"
         },
         {
           "label": "200 mg Capsule Bottle",
-          "image": "image3"
+          "image": "https://i.ibb.co/SLH20zG/xalkori-250.jpg"
         },
         {
           "label": "20 mg Oral Pellets",
-          "image": "image4"
+          "image": "https://i.ibb.co/SDKgrfJT/xalkori-20.jpg"
         },
         {
           "label": "50 mg Oral Pellets",
-          "image": "image5"
+          "image": "https://i.ibb.co/JfmBzSX/xalkori-50.jpg"
         },
         {
           "label": "150 mg Oral Pellets",
-          "image": "image6"
+          "image": "https://i.ibb.co/chvbwL83/xalkori-150.jpg"
         }
       ]
     },

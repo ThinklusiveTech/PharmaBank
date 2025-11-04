@@ -1,6 +1,10 @@
 from pydantic import BaseModel
 from typing import Dict, List, Optional, Union, Any
 
+class Bookmark(BaseModel):
+    user_id: str
+    drug_id: str
+
 class Users(BaseModel):
     name: str
     email: str

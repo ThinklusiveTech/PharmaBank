@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from login import login_router
 from drug import drug_router
+from bookmark import bookmark_router
+
 
 app = FastAPI()
 
@@ -22,6 +24,7 @@ app.add_middleware(
 
 app.include_router(login_router)
 app.include_router(drug_router)
+app.include_router(bookmark_router)
 
 @app.get("/", response_model=dict)
 async def root():

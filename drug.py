@@ -4,6 +4,7 @@ from typing import Optional, List, Dict, Any
 from models import DrugData
 from database import db
 from pydantic import BaseModel, Field
+from jwt_handler import get_current_user
 
 drug_router = APIRouter()
 
@@ -35,7 +36,7 @@ def drug_helper(drug) -> dict:
     drug["_id"] = str(drug["_id"])
     return drug
 
-from jwt_handler import get_current_user
+
 
 @drug_router.post("/drugs/", response_model=DrugResponse)
 async def create_drug(drug: DrugData, user: dict = Depends(get_current_user)):
