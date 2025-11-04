@@ -7,6 +7,10 @@ from typing import Dict, List, Any
 
 bookmark_router = APIRouter()
 
+# ---------------- Request Models ----------------
+class BookmarkRequest(BaseModel):
+    drug_id: str
+
 # ---------------- Response Models ----------------
 class BookmarkResponse(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -28,8 +32,9 @@ def drug_helper(drug) -> dict:
     drug["_id"] = str(drug["_id"])
     return drug
 
-@bookmark_router.post("/bookmarks/{drug_id}", response_model=BookmarkResponse)
-async def bookmark_drug(drug_id: str, user: dict = Depends(get_current_user)):
+@bookmark_router.post("/bookmarks/", response_model=BookmarkResponse)
+async def bookmark_drug(request: BookmarkRequest, user: dict = Depends(get_current_user)):
+    drug_id = request.drug_id
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid drug ID")
 
