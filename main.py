@@ -3,16 +3,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from login import login_router
 from drug import drug_router
 from bookmark import bookmark_router
+import os
 
 
 app = FastAPI()
 
-origins = [
-    "http://localhost:3004",
-    "http://127.0.0.1:3000",
-    "https://localhost:3004",
-    "https://cmcintel.com",
-]
+# CORS configuration
+environment = os.getenv("ENVIRONMENT", "development")
+if environment == "production":
+    origins = [
+        "https://cmcintel.com",  # Replace with your actual frontend domain
+        "https://cmcintel.com/v1",  # Include www if applicable
+    ]
+else:
+    origins = ["*"]  # Allow all origins in development
 
 app.add_middleware(
     CORSMiddleware,
