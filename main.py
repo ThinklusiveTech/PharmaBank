@@ -26,9 +26,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(login_router, prefix="/v1")
-app.include_router(drug_router, prefix="/v1")
-app.include_router(bookmark_router, prefix="/v1")
+app.include_router(login_router)
+app.include_router(drug_router)
+app.include_router(bookmark_router)
 
 @app.get("/", response_model=dict)
 async def root():
