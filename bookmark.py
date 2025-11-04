@@ -2,49 +2,53 @@ from fastapi import APIRouter, Depends, HTTPException
 from bson import ObjectId
 from database import db
 from jwt_handler import get_current_user
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Dict, List, Any
 
 bookmark_router = APIRouter()
+
 # ---------------- Response Models ----------------
 class BookmarkResponse(BaseModel):
-    message : str
-    data: Dict[str,any]
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    message: str
+    data: Dict[str, Any]
 
 class MessageResponse(BaseModel):
-    message : str
-    data: Dict[str,Any] = None
+    message: str
 
 class BookmarkListResponse(BaseModel):
-   message : str
-   total_bookmarks: int
-   data: List[Dict[str, Any]]
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    message: str
+    total_bookmarks: int
+    data: List[Dict[str, Any]]
 
-  # ---------------- Helpers ----------------
+# ---------------- Helpers ----------------
 def drug_helper(drug) -> dict:
     """Convert MongoDB _id to str for response"""
     drug["_id"] = str(drug["_id"])
-    return drug  
+    return drug
 
-@bookmark_router.post("/bookmark/{drug_id}",response_model = BookmarkResponse)
-async def add_bookmark(drug_id: str, User: dict = Depends(get_current_user)):
+@bookmark_router.post("/bookmarks/{drug_id}", response_model=BookmarkResponse)
+async def bookmark_drug(drug_id: str, user: dict = Depends(get_current_user)):
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid drug ID")
-    
-               # if drug exists or not 
+
+    # Check if drug exists
     drug = await db.drugs.find_one({"_id": ObjectId(drug_id)})
     if not drug:
-      raise HTTPException(status_code=404, detail="Drug not found")
-    existing = await db.bookmarks.find_one({"user_id":str(user["_id"]),"drug_id":drug_id})
+        raise HTTPException(status_code=404, detail="Drug not found")
+
+    # Check if already bookmarked
+    existing = await db.bookmarks.find_one({"user_id": str(user["_id"]), "drug_id": drug_id})
     if existing:
-      raise HTTPException(status_code=409, detail="Bookmark already exists")
-    
+        raise HTTPException(status_code=409, detail="Drug already bookmarked")
+
     bookmark_data = {
-        "user_id": str(User["_id"]),
+        "user_id": str(user["_id"]),
         "drug_id": drug_id
-      }
+    }
     await db.bookmarks.insert_one(bookmark_data)
-    return MessageResponse(message="Bookmark added successfully",data=drug_helper(drug))
+    return BookmarkResponse(message="Drug bookmarked successfully", data=drug_helper(drug))
 
 
 
