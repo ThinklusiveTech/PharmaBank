@@ -35,24 +35,31 @@ def drug_helper(drug) -> dict:
 @bookmark_router.post("/bookmarks/", response_model=BookmarkResponse)
 async def bookmark_drug(request: BookmarkRequest, user: dict = Depends(get_current_user)):
     drug_id = request.drugId
+    print(f"Received bookmark request for drug_id: {drug_id}, user: {user['_id']}")
     if not ObjectId.is_valid(drug_id):
+        print(f"Invalid drug ID: {drug_id}")
         raise HTTPException(status_code=400, detail="Invalid drug ID")
 
     # Check if drug exists
     drug = await db.drugs.find_one({"_id": ObjectId(drug_id)})
+    print(f"Drug lookup result: {drug is not None}")
     if not drug:
+        print(f"Drug not found: {drug_id}")
         raise HTTPException(status_code=404, detail="Drug not found")
 
     # Check if already bookmarked
     existing = await db.bookmarks.find_one({"user_id": str(user["_id"]), "drug_id": drug_id})
+    print(f"Existing bookmark check: {existing is not None}")
     if existing:
+        print(f"Drug already bookmarked: {drug_id}")
         raise HTTPException(status_code=409, detail="Drug already bookmarked")
 
     bookmark_data = {
         "user_id": str(user["_id"]),
         "drug_id": drug_id
     }
-    await db.bookmarks.insert_one(bookmark_data)
+    result = await db.bookmarks.insert_one(bookmark_data)
+    print(f"Bookmark inserted with ID: {result.inserted_id}")
     return BookmarkResponse(message="Drug bookmarked successfully", data=drug_helper(drug))
 
 
