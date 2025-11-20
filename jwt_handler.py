@@ -9,7 +9,7 @@ from bson import ObjectId
 
 
 # ---------------- Security Config ----------------
-SECRET_KEY = os.getenv("SECRET_KEY", "super_secret_key_change_me")  # 🔐 Use env var in production
+SECRET_KEY = os.getenv("SECRET_KEY", "your_super_secret_key_here")  # 🔐 Use env var in production
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 

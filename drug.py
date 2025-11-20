@@ -1,10 +1,14 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from bson import ObjectId
 from typing import Optional, List, Dict, Any
 from models import DrugData
 from database import db
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from jwt_handler import get_current_user
+import json
+import os
+
+import uuid
 
 drug_router = APIRouter()
 
@@ -39,8 +43,86 @@ def drug_helper(drug) -> dict:
 
 
 @drug_router.post("/drugs/", response_model=DrugResponse)
-async def create_drug(drug: DrugData, user: dict = Depends(get_current_user)):
-    drug_data = drug.dict()
+async def create_drug(
+    data: str = Form(...),
+    files: List[UploadFile] = File(None),
+    user: dict = Depends(get_current_user)
+):
+    # Parse and validate JSON data using DrugData model
+    try:
+        drug_data_dict = json.loads(data)
+        validated_drug_data = DrugData(**drug_data_dict)
+        drug_data = validated_drug_data.dict()
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON in data field")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
+
+    # Handle file uploads dynamically with security checks and field mapping
+    appendices = {}
+    upload_dir = "uploads"
+    os.makedirs(upload_dir, exist_ok=True)
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB limit
+    ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+
+    # Define field mappings for specific files
+    FIELD_MAPPINGS = {
+        "chemicalStructure": ["drugSubstance", "physicalAndChemicalProperties", "chemicalStructure"],
+        # Add more mappings as needed
+    }
+
+    def set_nested_value(data, keys, value):
+        """Helper to set nested dictionary value, handles arrays for multiple files"""
+        for key in keys[:-1]:
+            data = data.setdefault(key, {})
+        final_key = keys[-1]
+        if final_key in data:
+            # If field already exists, convert to array if not already
+            if not isinstance(data[final_key], list):
+                data[final_key] = [data[final_key]]
+            data[final_key].append(value)
+        else:
+            data[final_key] = value
+
+    if files:
+        for file in files:
+            if file.filename:
+                # Security: Check file size
+                file_size = 0
+                content = await file.read()
+                file_size = len(content)
+                if file_size > MAX_FILE_SIZE:
+                    raise HTTPException(status_code=400, detail=f"File {file.filename} too large (max 10MB)")
+
+                # Security: Check file type
+                if file.content_type not in ALLOWED_TYPES:
+                    raise HTTPException(status_code=400, detail=f"File {file.filename} type not allowed (only images)")
+
+                # Generate unique filename to avoid conflicts
+                file_extension = os.path.splitext(file.filename)[1]
+                unique_filename = f"{uuid.uuid4()}{file_extension}"
+                file_path = os.path.join(upload_dir, unique_filename)
+                relative_path = f"uploads/{unique_filename}"
+
+                try:
+                    with open(file_path, "wb") as f:
+                        f.write(content)
+
+                    # Check if file maps to a specific JSON field (case-insensitive)
+                    base_filename = os.path.splitext(file.filename)[0].lower()  # Remove extension and lowercase
+                    if base_filename in FIELD_MAPPINGS:
+                        # Set the specific field in drug_data
+                        set_nested_value(drug_data, FIELD_MAPPINGS[base_filename], relative_path)
+
+                    # Always store in appendices
+                    appendices[file.filename] = relative_path
+
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"Failed to save file {file.filename}: {str(e)}")
+
+    # Add appendices to drug_data if any files were uploaded
+    if appendices:
+        drug_data["appendices"] = appendices
 
     # Auto-generate CID if not provided
     if not drug_data.get("cid"):
