@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from login import login_router
 from drug import drug_router
 from bookmark import bookmark_router
+from fastapi.staticfiles import StaticFiles
 import os
 
 
@@ -21,17 +22,19 @@ else:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Mount static files directory to serve uploaded images
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 
 app.include_router(login_router)
 app.include_router(drug_router)
 app.include_router(bookmark_router)
+
+# Mount static files directory to serve uploaded images
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 @app.get("/", response_model=dict)
 async def root():
