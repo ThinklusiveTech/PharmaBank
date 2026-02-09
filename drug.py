@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Request, Response
 from bson import ObjectId
 from typing import Optional, List, Dict, Any
-from models import DrugData
+from models import NewDrugData
 from database import db
 from pydantic import BaseModel
 from jwt_handler import get_current_user
@@ -12,17 +12,20 @@ import base64
 from datetime import datetime
 
 
+
 drug_router = APIRouter()
 
 
 class DrugUpdate(BaseModel):
+    # New schema fields only
     cid: Optional[Any] = None
-    version: Optional[Any] = None
-    marketInformation: Optional[Any] = None
-    drugSubstance: Optional[Any] = None
-    drugProduct: Optional[Any] = None
-    appendices: Optional[Any] = None
-    references: Optional[Any] = None
+    MarketInformation: Optional[Any] = None
+    PhysicalChemicalProperties: Optional[Any] = None
+    ProcessDevelopment: Optional[Any] = None
+    AnalyticalDevelopment: Optional[Any] = None
+    DrugProductInformation: Optional[Any] = None
+    Appendices: Optional[Any] = None
+
 
 
 # ---------------- Response Models ----------------
@@ -73,10 +76,18 @@ async def create_drug(request: Request, user: dict = Depends(get_current_user)):
     # 2️⃣ Extract JSON DATA
     try:
         drug_data_dict = json.loads(form["data"])
-        validated = DrugData(**drug_data_dict)
+        
+        # Validate with new schema only
+        validated = NewDrugData(**drug_data_dict)
         drug_data = validated.dict()
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"JSON validation error: {str(e)}")
+        print(f"[DEBUG] Using NEW schema")
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"JSON parse error: {str(e)}")
+    except Exception as validation_error:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"JSON validation error: {str(validation_error)[:200]}"
+        )
 
     # 3️⃣ Extract dynamic files: chemicalStructure_0, appendix5_0, appendix5_1 etc.
     uploaded_files: List[(str, UploadFile)] = []
@@ -89,8 +100,13 @@ async def create_drug(request: Request, user: dict = Depends(get_current_user)):
     ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
     MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB max file
 
+    # Updated field mappings for new schema
+    # Images can be uploaded to:
+    # 1. AnalyticalDevelopment.dosageFormAndStrength[].images
+    # 2. DrugProductInformation.labelingInformation[].image[]
     FIELD_MAPPINGS = {
-        "chemicalStructure": ["drugSubstance", "physicalAndChemicalProperties", "chemicalStructure"]
+        "dosageFormImages": ["AnalyticalDevelopment", "dosageFormAndStrength", 0, "images"],
+        "labelingImages": ["DrugProductInformation", "labelingInformation", 0, "image"]
     }
 
     appendices = {}
@@ -129,31 +145,24 @@ async def create_drug(request: Request, user: dict = Depends(get_current_user)):
         clean_name = field_name
         print(f"[DEBUG] clean_name: {clean_name}")
 
-        # Apply mapping
+        # Apply mapping for recognized image fields
         if clean_name in FIELD_MAPPINGS:
-            print(f"[DEBUG] Setting mapped field {clean_name} as Base64")
-            set_nested_value(drug_data, FIELD_MAPPINGS[clean_name], base64_image)
-            print(f"[DEBUG] After setting, chemicalStructure length: {len(base64_image)}")
+            value_to_set = base64_image
+            
+            # Special handling for LabelingInformation images which expects ImageObject
+            if clean_name == "labelingImages":
+                 value_to_set = {
+                     "imageData": base64_image,
+                     "fileName": file.filename,
+                     "contentType": file.content_type
+                 }
+            
+            print(f"[DEBUG] Setting mapped field {clean_name}")
+            set_nested_value(drug_data, FIELD_MAPPINGS[clean_name], value_to_set)
+            print(f"[DEBUG] After setting {clean_name}, payload prepared")
         else:
-            # Appendices (supports multiple files)
-            print(f"[DEBUG] Adding to appendices - {clean_name}")
-            appendices.setdefault(clean_name, [])
-            appendices[clean_name].append(base64_image)
-
-    # Merge appendices with existing data from JSON
-    if appendices:
-        print(f"[DEBUG] Uploaded appendices to merge: {appendices}")
-        # Initialize appendices if not exists or is None
-        if "appendices" not in drug_data or drug_data["appendices"] is None:
-            drug_data["appendices"] = {}
-        elif not isinstance(drug_data["appendices"], dict):
-            # If appendices exists but is not a dict, reset it
-            drug_data["appendices"] = {}
-        
-        print(f"[DEBUG] Existing appendices before merge: {drug_data.get('appendices')}")
-        # Merge uploaded files with existing appendices from JSON
-        drug_data["appendices"].update(appendices)
-        print(f"[DEBUG] Final appendices after merge: {drug_data['appendices']}")
+            # Skip unrecognized files - new schema doesn't support arbitrary file uploads
+            print(f"[WARN] File field '{clean_name}' not mapped - skipping")
 
     # 6️⃣ Auto-generate CID if not provided
     if not drug_data.get("cid"):
@@ -167,11 +176,11 @@ async def create_drug(request: Request, user: dict = Depends(get_current_user)):
         else:
             drug_data["cid"] = "D001"
 
-    # 7️⃣ Save to MongoDB
-    print(f"[DEBUG] Saving to DB - appendices field: {drug_data.get('appendices')}")
+    # 6️⃣ Save to MongoDB
+    print(f"[DEBUG] Saving to DB - cid: {drug_data.get('cid')}")
     inserted = await db.drugs.insert_one(drug_data)
     created_drug = await db.drugs.find_one({"_id": inserted.inserted_id})
-    print(f"[DEBUG] Retrieved from DB - appendices field: {created_drug.get('appendices')}")
+    print(f"[DEBUG] Retrieved from DB - _id: {created_drug.get('_id')}")
 
     response_data = drug_helper(created_drug)
     print(f"[DEBUG] After drug_helper - appendices field: {response_data.get('appendices')}")
@@ -200,10 +209,10 @@ async def create_drug(request: Request, user: dict = Depends(get_current_user)):
 
 # ---------------- GET ALL DRUGS ----------------
 @drug_router.get("/drugs/", response_model=DrugListResponse)
-async def get_all_drugs(request: Request, skip: int = 0, limit: int = 10, user: dict = Depends(get_current_user)):
+async def get_all_drugs(request: Request, skip: int = 0,  user: dict = Depends(get_current_user)):
     drugs = []
     base_url = str(request.base_url).rstrip("/")
-    cursor = db.drugs.find().skip(skip).limit(limit)
+    cursor = db.drugs.find().skip(skip)
 
     async for drug in cursor:
         response_data = drug_helper(drug, base_url)
@@ -271,29 +280,34 @@ async def update_drug(drug_id: str, updated_drug: DrugUpdate, user: dict = Depen
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid ID")
 
+    # Build update data from new schema fields only
     update_data = {}
-
-    # Flatten nested update data
-    if updated_drug.marketInformation:
-        update_data.update({
-            "brand_name": updated_drug.marketInformation.get("brandName"),
-            "indication": updated_drug.marketInformation.get("indication"),
-            "generic_name": updated_drug.marketInformation.get("genericName"),
-        })
-
+    
+    # Update CID if provided
     if updated_drug.cid is not None:
         update_data["cid"] = updated_drug.cid
-
-    if updated_drug.version is not None:
-        update_data["version"] = updated_drug.version
-
-    if updated_drug.references is not None:
-        update_data["references"] = updated_drug.references
-
-    update_data = {k: v for k, v in update_data.items() if v is not None}
+    
+    # Update main sections of new schema
+    if updated_drug.MarketInformation is not None:
+        update_data["MarketInformation"] = updated_drug.MarketInformation
+    
+    if updated_drug.PhysicalChemicalProperties is not None:
+        update_data["PhysicalChemicalProperties"] = updated_drug.PhysicalChemicalProperties
+    
+    if updated_drug.ProcessDevelopment is not None:
+        update_data["ProcessDevelopment"] = updated_drug.ProcessDevelopment
+    
+    if updated_drug.AnalyticalDevelopment is not None:
+        update_data["AnalyticalDevelopment"] = updated_drug.AnalyticalDevelopment
+    
+    if updated_drug.DrugProductInformation is not None:
+        update_data["DrugProductInformation"] = updated_drug.DrugProductInformation
+    
+    if updated_drug.Appendices is not None:
+        update_data["Appendices"] = updated_drug.Appendices
 
     if not update_data:
-        raise HTTPException(status_code=400, detail="No valid fields")
+        raise HTTPException(status_code=400, detail="No valid fields to update")
 
     result = await db.drugs.update_one(
         {"_id": ObjectId(drug_id)},
