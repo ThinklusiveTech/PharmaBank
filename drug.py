@@ -55,34 +55,48 @@ def drug_helper(drug, base_url=None) -> dict:
 @drug_router.post("/drugs/", response_model=DrugResponse)
 async def create_drug(request: Request, user: dict = Depends(get_current_user)):
     """Handles JSON form + dynamic file uploads + path building"""
+    
+    # Check Content-Type
+    content_type = request.headers.get("content-type", "")
+    print(f"[DEBUG] Request Content-Type: {content_type}")
+    
+    uploaded_files = []
+    drug_data_dict = {}
 
-    # 1️⃣ Read entire multipart form
-    form = await request.form()
-    print(f"[DEBUG] Form keys received: {list(form.keys())}")
-    print(f"[DEBUG] Form data types: {[(k, type(v).__name__) for k, v in form.items()]}")
-
-    # Debug: Check if chemicalStructure is in form
-    if "chemicalStructure" in form:
-        file_obj = form["chemicalStructure"]
-        print(f"[DEBUG] chemicalStructure file object: {file_obj}")
-        print(f"[DEBUG] chemicalStructure filename: {getattr(file_obj, 'filename', 'No filename')}")
-        print(f"[DEBUG] chemicalStructure content_type: {getattr(file_obj, 'content_type', 'No content_type')}")
-    else:
-        print(f"[DEBUG] chemicalStructure NOT found in form")
-
-    if "data" not in form:
-        raise HTTPException(status_code=400, detail="Missing 'data' JSON field")
-
-    # 2️⃣ Extract JSON DATA
-    try:
-        drug_data_dict = json.loads(form["data"])
+    if "multipart/form-data" in content_type:
+        # Standard multipart/form-data handling
+        # 1️⃣ Read entire multipart form
+        form = await request.form()
+        print(f"[DEBUG] Form keys received: {list(form.keys())}")
         
+        if "data" not in form:
+            raise HTTPException(status_code=400, detail="Missing 'data' JSON field in multipart form. If sending JSON only, set Content-Type to application/json")
+
+        try:
+            drug_data_dict = json.loads(form["data"])
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=400, detail=f"JSON parse error in 'data' field: {str(e)}")
+
+        # Extract files from form
+        for key, val in form.items():
+            if hasattr(val, 'filename'):
+                uploaded_files.append((key, val))
+        print(f"[DEBUG] uploaded_files: {uploaded_files}")
+        
+    else:
+        # Assume JSON (application/json or missing header)
+        try:
+            drug_data_dict = await request.json()
+            print(f"[DEBUG] Received raw JSON body")
+        except json.JSONDecodeError:
+             raise HTTPException(status_code=400, detail="Invalid JSON body. Ensure Content-Type is application/json or body is valid JSON")
+
+    # 2️⃣ Validate JSON DATA
+    try:
         # Validate with new schema only
         validated = NewDrugData(**drug_data_dict)
         drug_data = validated.dict()
         print(f"[DEBUG] Using NEW schema")
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=400, detail=f"JSON parse error: {str(e)}")
     except Exception as validation_error:
         raise HTTPException(
             status_code=400, 
@@ -90,11 +104,7 @@ async def create_drug(request: Request, user: dict = Depends(get_current_user)):
         )
 
     # 3️⃣ Extract dynamic files: chemicalStructure_0, appendix5_0, appendix5_1 etc.
-    uploaded_files: List[(str, UploadFile)] = []
-    for key, val in form.items():
-        if hasattr(val, 'filename'):
-            uploaded_files.append((key, val))
-    print(f"[DEBUG] uploaded_files: {uploaded_files}")
+    # (uploaded_files list is already populated above)
 
     # 4️⃣ File saving config
     ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
