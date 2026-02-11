@@ -29,9 +29,9 @@ app.add_middleware(
 
 
 
-app.include_router(login_router)
-app.include_router(drug_router)
-app.include_router(bookmark_router)
+app.include_router(login_router, prefix="/v1")
+app.include_router(drug_router, prefix="/v1")
+app.include_router(bookmark_router, prefix="/v1")
 
 # Create uploads directory if it doesn't exist
 os.makedirs("uploads", exist_ok=True)

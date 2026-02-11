@@ -95,7 +95,7 @@ async def create_drug(request: Request, user: dict = Depends(get_current_user)):
     try:
         # Validate with new schema only
         validated = NewDrugData(**drug_data_dict)
-        drug_data = validated.dict()
+        drug_data = validated.model_dump(by_alias=True)
         print(f"[DEBUG] Using NEW schema")
     except Exception as validation_error:
         raise HTTPException(
@@ -123,16 +123,37 @@ async def create_drug(request: Request, user: dict = Depends(get_current_user)):
 
     # Helper to insert nested values
     def set_nested_value(data, keys, value):
-        for key in keys[:-1]:
-            data = data.setdefault(key, {})
-        final = keys[-1]
-
-        if final in data and data[final] is not None:
-            if not isinstance(data[final], list):
-                data[final] = [data[final]]
-            data[final].append(value)
+        for i in range(len(keys) - 1):
+            key = keys[i]
+            next_key = keys[i+1]
+            
+            if isinstance(data, list):
+                # If current data is a list, key must be an integer index
+                idx = int(key)
+                while len(data) <= idx:
+                    data.append({})
+                data = data[idx]
+            else:
+                # If current data is a dict
+                if key not in data or data[key] is None:
+                    # Look ahead to see if tomorrow's key is an integer (index)
+                    data[key] = [] if isinstance(next_key, int) else {}
+                data = data[key]
+                
+        final_key = keys[-1]
+        if isinstance(data, list):
+            idx = int(final_key)
+            while len(data) <= idx:
+                data.append(None)
+            data[idx] = value
         else:
-            data[final] = value
+            # Special handling for existing values/lists
+            if final_key in data and data[final_key] is not None:
+                if not isinstance(data[final_key], list):
+                    data[final_key] = [data[final_key]]
+                data[final_key].append(value)
+            else:
+                data[final_key] = value
 
     # 5️⃣ Save every uploaded file as Base64 in MongoDB
     for field_name, file in uploaded_files:
