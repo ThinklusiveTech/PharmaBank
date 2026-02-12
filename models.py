@@ -1,5 +1,8 @@
-from pydantic import BaseModel
+
+from pydantic import BaseModel, Field, field_validator
 from typing import Dict, List, Optional, Union, Any
+from datetime import datetime
+
 
 class Bookmark(BaseModel):
     user_id: str
@@ -37,8 +40,25 @@ class MarketInformation(BaseModel):
     apiName: Optional[str] = None
     mechanismOfAction: Optional[str] = None
     companyName: Optional[str] = None
-    firstApprovedDate: Optional[str] = None
+    firstApprovedDate: Optional[Union[int, str]] = None
+
     firstApprovedRegion: Optional[str] = None
+
+    @field_validator('firstApprovedDate', mode='before')
+    @classmethod
+    def handle_date_field(cls, v):
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str):
+            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
+                try:
+                    dt = datetime.strptime(v, fmt)
+                    return int(dt.timestamp())
+                except ValueError:
+                    continue
+        return v
+
+
 
 
 # ==================== Physical Chemical Properties ====================
@@ -49,16 +69,49 @@ class AdditionalInfo(BaseModel):
     patientSegments: Optional[str] = None
     dosageForm: Optional[str] = None
     strength: Optional[str] = None
-    approvedDate: Optional[str] = None
+    approvedDate: Optional[Union[int, str]] = None
+
     regulatoryBodies: Optional[str] = None
+
+    @field_validator('approvedDate', mode='before')
+    @classmethod
+    def handle_date_field(cls, v):
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str):
+            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
+                try:
+                    dt = datetime.strptime(v, fmt)
+                    return int(dt.timestamp())
+                except ValueError:
+                    continue
+        return v
+
+
 
 
 class DrugPatent(BaseModel):
     designationType: Optional[str] = None
-    expiryDate: Optional[str] = None
+    expiryDate: Optional[Union[int, str]] = None
     regulatoryBody: Optional[str] = None
     exclusivityConsideration: Optional[str] = None
     impactForGenericFilers: Optional[str] = None
+
+    @field_validator('expiryDate', mode='before')
+    @classmethod
+    def handle_date_field(cls, v):
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str):
+            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
+                try:
+                    dt = datetime.strptime(v, fmt)
+                    return int(dt.timestamp())
+                except ValueError:
+                    continue
+        return v
+
+
 
 
 class GenericEntrant(BaseModel):
@@ -66,10 +119,27 @@ class GenericEntrant(BaseModel):
     companyName: Optional[str] = None
     dosageDetails: Optional[str] = None
     approvalType: Optional[str] = None
-    andaSubmissionDate: Optional[str] = None
-    tentativeApprovalDate: Optional[str] = None
-    finalApprovalDate: Optional[str] = None
+    andaSubmissionDate: Optional[Union[int, str]] = None
+    tentativeApprovalDate: Optional[Union[int, str]] = None
+    finalApprovalDate: Optional[Union[int, str]] = None
+
     ftfExclusivity: Optional[str] = None
+
+    @field_validator('andaSubmissionDate', 'tentativeApprovalDate', 'finalApprovalDate', mode='before')
+    @classmethod
+    def handle_date_field(cls, v):
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str):
+            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
+                try:
+                    dt = datetime.strptime(v, fmt)
+                    return int(dt.timestamp())
+                except ValueError:
+                    continue
+        return v
+
+
 
 
 class GenericApprovedByEma(BaseModel):
@@ -78,7 +148,24 @@ class GenericApprovedByEma(BaseModel):
     dosageDetails: Optional[str] = None
     chmpOpinion: Optional[str] = None
     ecDecision: Optional[str] = None
-    ecApprovalDate: Optional[str] = None
+    ecApprovalDate: Optional[Union[int, str]] = None
+
+
+    @field_validator('ecApprovalDate', mode='before')
+    @classmethod
+    def handle_date_field(cls, v):
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str):
+            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
+                try:
+                    dt = datetime.strptime(v, fmt)
+                    return int(dt.timestamp())
+                except ValueError:
+                    continue
+        return v
+
+
 
 
 class PhysicalChemicalProperties(BaseModel):
@@ -86,6 +173,9 @@ class PhysicalChemicalProperties(BaseModel):
     synonyms: Optional[str] = None
     iupacName: Optional[str] = None
     molecularWeight: Optional[str] = None
+    molecularFormula: Optional[str] = None
+    bcsClass: Optional[str] = None
+    monoisotopicMass: Optional[str] = None
     structureName: Optional[str] = None
     stereochemistry: Optional[str] = None
     solubility: Optional[str] = None
@@ -105,9 +195,26 @@ class AvailableDmfVendor(BaseModel):
     regulatoryBody: Optional[str] = None
     status: Optional[str] = None
     type: Optional[str] = None
-    submissionDate: Optional[str] = None
+    submissionDate: Optional[Union[int, str]] = None
+
     holder: Optional[str] = None
     apiForm: Optional[str] = None
+
+    @field_validator('submissionDate', mode='before')
+    @classmethod
+    def handle_date_field(cls, v):
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str):
+            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
+                try:
+                    dt = datetime.strptime(v, fmt)
+                    return int(dt.timestamp())
+                except ValueError:
+                    continue
+        return v
+
+
 
 
 class ManufacturingRoute(BaseModel):
@@ -138,6 +245,13 @@ class ProcessDevelopment(BaseModel):
     drugSubstanceSpecifications: Optional[str] = None
 
 
+# ==================== Drug Product Information ====================
+class ImageObject(BaseModel):
+    imageData: Optional[str] = None  # Base64 encoded image or URL
+    fileName: Optional[str] = None
+    contentType: Optional[str] = None
+
+
 # ==================== Analytical Development ====================
 class DosageFormAndStrength(BaseModel):
     strength: Optional[str] = None
@@ -148,7 +262,14 @@ class DosageFormAndStrength(BaseModel):
     weight: Optional[str] = None
     packaging: Optional[str] = None
     ndcCode: Optional[str] = None
-    images: Optional[str] = None
+    images: Optional[List[ImageObject]] = []
+
+    @field_validator('images', mode='before')
+    @classmethod
+    def handle_empty_string(cls, v):
+        if v == "":
+            return []
+        return v
 
 
 class SupplyChain(BaseModel):
@@ -174,9 +295,27 @@ class BaBeStudy(BaseModel):
 
 
 class ShelfLife(BaseModel):
-    currentExpirationDate: Optional[str] = None
+    currentExpirationDate: Optional[Union[int, str]] = None
+
     strength: Optional[str] = None
-    expiryDate: Optional[str] = None
+    expiryDate: Optional[Union[int, str]] = None
+
+    @field_validator('currentExpirationDate', 'expiryDate', mode='before')
+    @classmethod
+    def handle_date_field(cls, v):
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str):
+            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
+                try:
+                    dt = datetime.strptime(v, fmt)
+                    return int(dt.timestamp())
+                except ValueError:
+                    continue
+        return v
+
+
+
 
 
 class AnalyticalDevelopment(BaseModel):
@@ -191,15 +330,15 @@ class AnalyticalDevelopment(BaseModel):
     formulationChallenges: Optional[str] = None
 
 
-# ==================== Drug Product Information ====================
-class ImageObject(BaseModel):
-    imageData: Optional[str] = None  # Base64 encoded image or URL
-    fileName: Optional[str] = None
-    contentType: Optional[str] = None
-
-
 class LabelingInformation(BaseModel):
     image: Optional[List[ImageObject]] = []
+
+    @field_validator('image', mode='before')
+    @classmethod
+    def handle_empty_string(cls, v):
+        if v == "":
+            return []
+        return v
 
 
 class DrugProductInformation(BaseModel):
@@ -220,10 +359,12 @@ class Appendices(BaseModel):
 # ==================== Main Drug Data Model ====================
 class NewDrugData(BaseModel):
     cid: Optional[str] = None  # Drug identifier (e.g., D001, D002)
-    MarketInformation: Optional[MarketInformation] = None
-    PhysicalChemicalProperties: Optional[PhysicalChemicalProperties] = None
-    ProcessDevelopment: Optional[ProcessDevelopment] = None
-    AnalyticalDevelopment: Optional[AnalyticalDevelopment] = None
-    DrugProductInformation: Optional[DrugProductInformation] = None
-    Appendices: Optional[Appendices] = None
+    market_information: Optional[MarketInformation] = Field(None, alias="MarketInformation")
+    physical_chemical_properties: Optional[PhysicalChemicalProperties] = Field(None, alias="PhysicalChemicalProperties")
+    process_development: Optional[ProcessDevelopment] = Field(None, alias="ProcessDevelopment")
+    analytical_development: Optional[AnalyticalDevelopment] = Field(None, alias="AnalyticalDevelopment")
+    drug_product_information: Optional[DrugProductInformation] = Field(None, alias="DrugProductInformation")
+    appendices: Optional[Appendices] = Field(None, alias="Appendices")
+
+NewDrugData.model_rebuild()
 
