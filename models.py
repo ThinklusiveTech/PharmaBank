@@ -1,6 +1,8 @@
 
 from pydantic import BaseModel, Field, field_validator
 from typing import Dict, List, Optional, Union, Any
+from datetime import datetime
+
 
 class Bookmark(BaseModel):
     user_id: str
@@ -38,8 +40,25 @@ class MarketInformation(BaseModel):
     apiName: Optional[str] = None
     mechanismOfAction: Optional[str] = None
     companyName: Optional[str] = None
-    firstApprovedDate: Optional[str] = None
+    firstApprovedDate: Optional[Union[int, str]] = None
+
     firstApprovedRegion: Optional[str] = None
+
+    @field_validator('firstApprovedDate', mode='before')
+    @classmethod
+    def handle_date_field(cls, v):
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str):
+            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
+                try:
+                    dt = datetime.strptime(v, fmt)
+                    return int(dt.timestamp())
+                except ValueError:
+                    continue
+        return v
+
+
 
 
 # ==================== Physical Chemical Properties ====================
@@ -50,16 +69,49 @@ class AdditionalInfo(BaseModel):
     patientSegments: Optional[str] = None
     dosageForm: Optional[str] = None
     strength: Optional[str] = None
-    approvedDate: Optional[str] = None
+    approvedDate: Optional[Union[int, str]] = None
+
     regulatoryBodies: Optional[str] = None
+
+    @field_validator('approvedDate', mode='before')
+    @classmethod
+    def handle_date_field(cls, v):
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str):
+            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
+                try:
+                    dt = datetime.strptime(v, fmt)
+                    return int(dt.timestamp())
+                except ValueError:
+                    continue
+        return v
+
+
 
 
 class DrugPatent(BaseModel):
     designationType: Optional[str] = None
-    expiryDate: Optional[str] = None
+    expiryDate: Optional[Union[int, str]] = None
     regulatoryBody: Optional[str] = None
     exclusivityConsideration: Optional[str] = None
     impactForGenericFilers: Optional[str] = None
+
+    @field_validator('expiryDate', mode='before')
+    @classmethod
+    def handle_date_field(cls, v):
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str):
+            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
+                try:
+                    dt = datetime.strptime(v, fmt)
+                    return int(dt.timestamp())
+                except ValueError:
+                    continue
+        return v
+
+
 
 
 class GenericEntrant(BaseModel):
@@ -67,10 +119,27 @@ class GenericEntrant(BaseModel):
     companyName: Optional[str] = None
     dosageDetails: Optional[str] = None
     approvalType: Optional[str] = None
-    andaSubmissionDate: Optional[str] = None
-    tentativeApprovalDate: Optional[str] = None
-    finalApprovalDate: Optional[str] = None
+    andaSubmissionDate: Optional[Union[int, str]] = None
+    tentativeApprovalDate: Optional[Union[int, str]] = None
+    finalApprovalDate: Optional[Union[int, str]] = None
+
     ftfExclusivity: Optional[str] = None
+
+    @field_validator('andaSubmissionDate', 'tentativeApprovalDate', 'finalApprovalDate', mode='before')
+    @classmethod
+    def handle_date_field(cls, v):
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str):
+            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
+                try:
+                    dt = datetime.strptime(v, fmt)
+                    return int(dt.timestamp())
+                except ValueError:
+                    continue
+        return v
+
+
 
 
 class GenericApprovedByEma(BaseModel):
@@ -79,7 +148,24 @@ class GenericApprovedByEma(BaseModel):
     dosageDetails: Optional[str] = None
     chmpOpinion: Optional[str] = None
     ecDecision: Optional[str] = None
-    ecApprovalDate: Optional[str] = None
+    ecApprovalDate: Optional[Union[int, str]] = None
+
+
+    @field_validator('ecApprovalDate', mode='before')
+    @classmethod
+    def handle_date_field(cls, v):
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str):
+            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
+                try:
+                    dt = datetime.strptime(v, fmt)
+                    return int(dt.timestamp())
+                except ValueError:
+                    continue
+        return v
+
+
 
 
 class PhysicalChemicalProperties(BaseModel):
@@ -109,9 +195,26 @@ class AvailableDmfVendor(BaseModel):
     regulatoryBody: Optional[str] = None
     status: Optional[str] = None
     type: Optional[str] = None
-    submissionDate: Optional[str] = None
+    submissionDate: Optional[Union[int, str]] = None
+
     holder: Optional[str] = None
     apiForm: Optional[str] = None
+
+    @field_validator('submissionDate', mode='before')
+    @classmethod
+    def handle_date_field(cls, v):
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str):
+            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
+                try:
+                    dt = datetime.strptime(v, fmt)
+                    return int(dt.timestamp())
+                except ValueError:
+                    continue
+        return v
+
+
 
 
 class ManufacturingRoute(BaseModel):
@@ -192,9 +295,27 @@ class BaBeStudy(BaseModel):
 
 
 class ShelfLife(BaseModel):
-    currentExpirationDate: Optional[str] = None
+    currentExpirationDate: Optional[Union[int, str]] = None
+
     strength: Optional[str] = None
-    expiryDate: Optional[str] = None
+    expiryDate: Optional[Union[int, str]] = None
+
+    @field_validator('currentExpirationDate', 'expiryDate', mode='before')
+    @classmethod
+    def handle_date_field(cls, v):
+        if isinstance(v, (int, float)):
+            return int(v)
+        if isinstance(v, str):
+            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
+                try:
+                    dt = datetime.strptime(v, fmt)
+                    return int(dt.timestamp())
+                except ValueError:
+                    continue
+        return v
+
+
+
 
 
 class AnalyticalDevelopment(BaseModel):
