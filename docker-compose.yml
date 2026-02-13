@@ -6,7 +6,6 @@ services:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
-
   fastapi:
     build: .
     container_name: chembank-api
@@ -16,7 +15,7 @@ services:
       - mongo
     environment:
       - MONGO_URL=mongodb://mongo:27017
+      - ENVIRONMENT=production  # Add this line
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload --forwarded-allow-ips "*"
-
 volumes:
   mongo-data: {}
