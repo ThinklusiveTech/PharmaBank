@@ -1,7 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Request, Response
 from bson import ObjectId
 from typing import Optional, List, Dict, Any
-from models import NewDrugData
+from models import (
+    NewDrugData, MarketInformation, PhysicalChemicalProperties, 
+    ProcessDevelopment, AnalyticalDevelopment, DrugProductInformation, Appendices
+)
 from database import db
 from pydantic import BaseModel
 from jwt_handler import get_current_user
@@ -18,13 +21,13 @@ drug_router = APIRouter()
 
 class DrugUpdate(BaseModel):
     # New schema fields only
-    cid: Optional[Any] = None
-    MarketInformation: Optional[Any] = None
-    PhysicalChemicalProperties: Optional[Any] = None
-    ProcessDevelopment: Optional[Any] = None
-    AnalyticalDevelopment: Optional[Any] = None
-    DrugProductInformation: Optional[Any] = None
-    Appendices: Optional[Any] = None
+    cid: Optional[str] = None
+    MarketInformation: Optional[MarketInformation] = None
+    PhysicalChemicalProperties: Optional[PhysicalChemicalProperties] = None
+    ProcessDevelopment: Optional[ProcessDevelopment] = None
+    AnalyticalDevelopment: Optional[AnalyticalDevelopment] = None
+    DrugProductInformation: Optional[DrugProductInformation] = None
+    Appendices: Optional[Appendices] = None
 
 
 
@@ -311,31 +314,8 @@ async def update_drug(drug_id: str, updated_drug: DrugUpdate, user: dict = Depen
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid ID")
 
-    # Build update data from new schema fields only
-    update_data = {}
-    
-    # Update CID if provided
-    if updated_drug.cid is not None:
-        update_data["cid"] = updated_drug.cid
-    
-    # Update main sections of new schema
-    if updated_drug.MarketInformation is not None:
-        update_data["MarketInformation"] = updated_drug.MarketInformation
-    
-    if updated_drug.PhysicalChemicalProperties is not None:
-        update_data["PhysicalChemicalProperties"] = updated_drug.PhysicalChemicalProperties
-    
-    if updated_drug.ProcessDevelopment is not None:
-        update_data["ProcessDevelopment"] = updated_drug.ProcessDevelopment
-    
-    if updated_drug.AnalyticalDevelopment is not None:
-        update_data["AnalyticalDevelopment"] = updated_drug.AnalyticalDevelopment
-    
-    if updated_drug.DrugProductInformation is not None:
-        update_data["DrugProductInformation"] = updated_drug.DrugProductInformation
-    
-    if updated_drug.Appendices is not None:
-        update_data["Appendices"] = updated_drug.Appendices
+    # Build update data from provided fields
+    update_data = updated_drug.model_dump(exclude_unset=True, by_alias=True)
 
     if not update_data:
         raise HTTPException(status_code=400, detail="No valid fields to update")

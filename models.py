@@ -4,6 +4,32 @@ from typing import Dict, List, Optional, Union, Any
 from datetime import datetime
 
 
+def handle_date_field(v):
+    """
+    Consolidated date validation logic.
+    Converts various date string formats or numeric timestamps to Unix timestamp (int).
+    Supported formats: DD-MM-YYYY, YYYY-MM-DD, DD/MM/YYYY, YYYY/MM/DD, DD.MM.YYYY, YYYY.MM.DD
+    """
+    if v is None or v == "":
+        return None
+    if isinstance(v, (int, float)):
+        return int(v)
+    if isinstance(v, str):
+        # Try various formats
+        formats = (
+            '%Y-%m-%d', '%d-%m-%Y',
+            '%Y/%m/%d', '%d/%m/%Y',
+            '%Y.%m.%d', '%d.%m.%Y'
+        )
+        for fmt in formats:
+            try:
+                dt = datetime.strptime(v, fmt)
+                return int(dt.timestamp())
+            except ValueError:
+                continue
+    return v
+
+
 class Bookmark(BaseModel):
     user_id: str
     drug_id: str
@@ -41,24 +67,12 @@ class MarketInformation(BaseModel):
     mechanismOfAction: Optional[str] = None
     companyName: Optional[str] = None
     firstApprovedDate: Optional[Union[int, str]] = None
-
     firstApprovedRegion: Optional[str] = None
 
     @field_validator('firstApprovedDate', mode='before')
     @classmethod
-    def handle_date_field(cls, v):
-        if isinstance(v, (int, float)):
-            return int(v)
-        if isinstance(v, str):
-            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
-                try:
-                    dt = datetime.strptime(v, fmt)
-                    return int(dt.timestamp())
-                except ValueError:
-                    continue
-        return v
-
-
+    def validate_date(cls, v):
+        return handle_date_field(v)
 
 
 # ==================== Physical Chemical Properties ====================
@@ -70,24 +84,12 @@ class AdditionalInfo(BaseModel):
     dosageForm: Optional[str] = None
     strength: Optional[str] = None
     approvedDate: Optional[Union[int, str]] = None
-
     regulatoryBodies: Optional[str] = None
 
     @field_validator('approvedDate', mode='before')
     @classmethod
-    def handle_date_field(cls, v):
-        if isinstance(v, (int, float)):
-            return int(v)
-        if isinstance(v, str):
-            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
-                try:
-                    dt = datetime.strptime(v, fmt)
-                    return int(dt.timestamp())
-                except ValueError:
-                    continue
-        return v
-
-
+    def validate_date(cls, v):
+        return handle_date_field(v)
 
 
 class DrugPatent(BaseModel):
@@ -99,19 +101,8 @@ class DrugPatent(BaseModel):
 
     @field_validator('expiryDate', mode='before')
     @classmethod
-    def handle_date_field(cls, v):
-        if isinstance(v, (int, float)):
-            return int(v)
-        if isinstance(v, str):
-            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
-                try:
-                    dt = datetime.strptime(v, fmt)
-                    return int(dt.timestamp())
-                except ValueError:
-                    continue
-        return v
-
-
+    def validate_date(cls, v):
+        return handle_date_field(v)
 
 
 class GenericEntrant(BaseModel):
@@ -122,24 +113,12 @@ class GenericEntrant(BaseModel):
     andaSubmissionDate: Optional[Union[int, str]] = None
     tentativeApprovalDate: Optional[Union[int, str]] = None
     finalApprovalDate: Optional[Union[int, str]] = None
-
     ftfExclusivity: Optional[str] = None
 
     @field_validator('andaSubmissionDate', 'tentativeApprovalDate', 'finalApprovalDate', mode='before')
     @classmethod
-    def handle_date_field(cls, v):
-        if isinstance(v, (int, float)):
-            return int(v)
-        if isinstance(v, str):
-            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
-                try:
-                    dt = datetime.strptime(v, fmt)
-                    return int(dt.timestamp())
-                except ValueError:
-                    continue
-        return v
-
-
+    def validate_date(cls, v):
+        return handle_date_field(v)
 
 
 class GenericApprovedByEma(BaseModel):
@@ -150,22 +129,10 @@ class GenericApprovedByEma(BaseModel):
     ecDecision: Optional[str] = None
     ecApprovalDate: Optional[Union[int, str]] = None
 
-
     @field_validator('ecApprovalDate', mode='before')
     @classmethod
-    def handle_date_field(cls, v):
-        if isinstance(v, (int, float)):
-            return int(v)
-        if isinstance(v, str):
-            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
-                try:
-                    dt = datetime.strptime(v, fmt)
-                    return int(dt.timestamp())
-                except ValueError:
-                    continue
-        return v
-
-
+    def validate_date(cls, v):
+        return handle_date_field(v)
 
 
 class PhysicalChemicalProperties(BaseModel):
@@ -196,25 +163,13 @@ class AvailableDmfVendor(BaseModel):
     status: Optional[str] = None
     type: Optional[str] = None
     submissionDate: Optional[Union[int, str]] = None
-
     holder: Optional[str] = None
     apiForm: Optional[str] = None
 
     @field_validator('submissionDate', mode='before')
     @classmethod
-    def handle_date_field(cls, v):
-        if isinstance(v, (int, float)):
-            return int(v)
-        if isinstance(v, str):
-            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
-                try:
-                    dt = datetime.strptime(v, fmt)
-                    return int(dt.timestamp())
-                except ValueError:
-                    continue
-        return v
-
-
+    def validate_date(cls, v):
+        return handle_date_field(v)
 
 
 class ManufacturingRoute(BaseModel):
@@ -296,26 +251,13 @@ class BaBeStudy(BaseModel):
 
 class ShelfLife(BaseModel):
     currentExpirationDate: Optional[Union[int, str]] = None
-
     strength: Optional[str] = None
     expiryDate: Optional[Union[int, str]] = None
 
     @field_validator('currentExpirationDate', 'expiryDate', mode='before')
     @classmethod
-    def handle_date_field(cls, v):
-        if isinstance(v, (int, float)):
-            return int(v)
-        if isinstance(v, str):
-            for fmt in ('%Y-%m-%d', '%d-%m-%Y'):
-                try:
-                    dt = datetime.strptime(v, fmt)
-                    return int(dt.timestamp())
-                except ValueError:
-                    continue
-        return v
-
-
-
+    def validate_date(cls, v):
+        return handle_date_field(v)
 
 
 class AnalyticalDevelopment(BaseModel):
@@ -367,4 +309,3 @@ class NewDrugData(BaseModel):
     appendices: Optional[Appendices] = Field(None, alias="Appendices")
 
 NewDrugData.model_rebuild()
-
