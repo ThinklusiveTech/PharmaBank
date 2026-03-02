@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from login import login_router
 from drug import drug_router
 from bookmark import bookmark_router
@@ -36,16 +37,8 @@ app.include_router(bookmark_router, prefix="/v1")
 # Create uploads directory if it doesn't exist
 os.makedirs("uploads", exist_ok=True)
 
-# Custom route to serve uploaded images with CORS headers
-from fastapi.responses import FileResponse
-
-@app.get("/uploads/{filename}")
-async def get_upload(filename: str):
-    file_path = os.path.join("uploads", filename)
-    
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(file_path, headers={"Access-Control-Allow-Origin": "*"})
+# Mount the uploads directory for serving images
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 @app.get("/", response_model=dict)
 async def root():

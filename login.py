@@ -2,10 +2,9 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from models import Users, ForgotPasswordRequest
 from database import db
-from jwt_handler import create_access_token
+from jwt_handler import create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, decode_token
 from hashing import get_password_hash, verify_password
 from typing import Optional
-from jwt_handler import get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 from bson import ObjectId
 from datetime import timedelta
 
@@ -14,6 +13,9 @@ login_router = APIRouter()
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 # ---------------- Register User ----------------
 @login_router.post("/register")
@@ -39,13 +41,71 @@ async def login_for_access_token(form_data: LoginRequest):
         data={"sub": str(user["_id"])},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
+    refresh_token = create_refresh_token(
+        data={"sub": str(user["_id"])}
+    )
+
+    # Store refresh token in DB
+    from datetime import datetime
+    await db.refresh_tokens.insert_one({
+        "user_id": str(user["_id"]),
+        "token": refresh_token,
+        "created_at": datetime.utcnow()
+    })
+
     user_data = {
         "id": str(user["_id"]),
         "name": user["name"],
         "email": user["email"],
         "roles": user.get("roles", ["admin"])
     }
-    return {"message": "User Login successfully", "access_token": access_token,  "data": user_data}
+    return {
+        "message": "User Login successfully",
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "data": user_data
+    }
+
+@login_router.post("/refresh")
+async def refresh_access_token(request: RefreshRequest):
+    payload = decode_token(request.refresh_token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid refresh token payload")
+
+    # Verify refresh token in DB
+    token_in_db = await db.refresh_tokens.find_one({
+        "user_id": user_id,
+        "token": request.refresh_token
+    })
+    if not token_in_db:
+        raise HTTPException(status_code=401, detail="Refresh token not found or revoked")
+
+    # Generate new access token
+    new_access_token = create_access_token(
+        data={"sub": user_id},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+
+    return {
+        "access_token": new_access_token,
+        "token_type": "bearer"
+    }
+
+@login_router.post("/logout")
+async def logout(request: RefreshRequest, current_user: dict = Depends(get_current_user)):
+    # Remove specific refresh token from DB
+    result = await db.refresh_tokens.delete_one({
+        "user_id": current_user["_id"],
+        "token": request.refresh_token
+    })
+    if result.deleted_count == 0:
+         raise HTTPException(status_code=404, detail="Refresh token not found")
+
+    return {"message": "Logged out successfully"}
 
 @login_router.post("/forgot-password")
 async def forgot_password(request: ForgotPasswordRequest):

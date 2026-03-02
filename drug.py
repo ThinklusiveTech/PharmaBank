@@ -2,11 +2,15 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, R
 from bson import ObjectId
 from typing import Optional, List, Dict, Any
 from models import (
-    NewDrugData, MarketInformation, PhysicalChemicalProperties, 
-    ProcessDevelopment, AnalyticalDevelopment, DrugProductInformation, Appendices
+    NewDrugData,
+    ProductOverview, PhysicalChemicalProperties,
+    RegulatoryInsights, GenericEntrants,
+    DrugSubstance, DrugProductInformation,
+    LabelingSection, BaBeStudies,
+    Appendices
 )
 from database import db
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict
 from jwt_handler import get_current_user
 import json
 import os
@@ -20,14 +24,20 @@ drug_router = APIRouter()
 
 
 class DrugUpdate(BaseModel):
-    # New schema fields only
+    model_config = ConfigDict(populate_by_name=True)
+
     cid: Optional[str] = None
-    MarketInformation: Optional[MarketInformation] = None
-    PhysicalChemicalProperties: Optional[PhysicalChemicalProperties] = None
-    ProcessDevelopment: Optional[ProcessDevelopment] = None
-    AnalyticalDevelopment: Optional[AnalyticalDevelopment] = None
-    DrugProductInformation: Optional[DrugProductInformation] = None
-    Appendices: Optional[Appendices] = None
+    product_overview: Optional[ProductOverview] = Field(None, alias="ProductOverview")
+    physical_chemical_properties: Optional[PhysicalChemicalProperties] = Field(None, alias="PhysicalChemicalProperties")
+    regulatory_insights: Optional[RegulatoryInsights] = Field(None, alias="RegulatoryInsights")
+    generic_entrants: Optional[GenericEntrants] = Field(None, alias="GenericEntrants")
+    drug_substance: Optional[DrugSubstance] = Field(None, alias="DrugSubstance")
+    drug_product_information: Optional[DrugProductInformation] = Field(None, alias="DrugProductInformation")
+    labeling_information: Optional[LabelingSection] = Field(None, alias="LabelingInformation")
+    babe_studies: Optional[BaBeStudies] = Field(None, alias="BaBeStudies")
+    sources: Optional[str] = Field(None, alias="Sources")
+    glossary: Optional[str] = Field(None, alias="Glossary")
+    appendices: Optional[Appendices] = Field(None, alias="Appendices")
 
 
 
@@ -49,9 +59,73 @@ class MessageResponse(BaseModel):
 
 # ---------------- Helpers ----------------
 def drug_helper(drug, base_url=None) -> dict:
-    """Convert MongoDB _id to str"""
+    """Convert MongoDB _id to str and expand local image paths to full URLs"""
     drug["_id"] = str(drug["_id"])
+    
+    if base_url:
+        def expand_urls(obj):
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    if isinstance(v, str) and v.startswith("/uploads/"):
+                        obj[k] = f"{base_url}{v}"
+                    else:
+                        expand_urls(v)
+            elif isinstance(obj, list):
+                for i in range(len(obj)):
+                    v = obj[i]
+                    if isinstance(v, str) and v.startswith("/uploads/"):
+                        obj[i] = f"{base_url}{v}"
+                    else:
+                        expand_urls(v)
+        
+        expand_urls(drug)
+        
     return drug
+
+
+def process_base64_images(data):
+    """
+    Recursively scan the data dictionary for Base64 image strings.
+    Handles:
+      - ImageObject dicts with imageData containing a base64 data URI
+      - ImageObject dicts with imageData already containing a plain URL (pass-through)
+    Saves decoded images to 'uploads/' and replaces imageData with a /uploads/ relative URL.
+    """
+    os.makedirs("uploads", exist_ok=True)
+
+    if isinstance(data, dict):
+        # Handle ImageObject: dict with 'imageData' key
+        if "imageData" in data and isinstance(data["imageData"], str):
+            raw = data["imageData"]
+            if raw.startswith("data:image/"):
+                # Base64 data URI — decode and save
+                try:
+                    header, encoded = raw.split(",", 1)
+                    mime_type = header.split(";")[0].split(":")[1]
+                    ext = mime_type.split("/")[1]
+                    if ext == "jpeg":
+                        ext = "jpg"
+                    image_bytes = base64.b64decode(encoded)
+                    unique_filename = f"{uuid.uuid4()}.{ext}"
+                    file_path = os.path.join("uploads", unique_filename)
+                    with open(file_path, "wb") as f:
+                        f.write(image_bytes)
+                    data["imageData"] = f"/uploads/{unique_filename}"
+                    print(f"[DEBUG] Smart Storage: Saved Base64 image → {file_path}")
+                except Exception as e:
+                    print(f"[ERROR] Smart Storage: Failed to process Base64 image: {e}")
+            # else: plain URL or /uploads/ path — leave as-is
+
+        # Recurse into all values
+        for k, v in data.items():
+            if k != "imageData":  # already handled above
+                process_base64_images(v)
+
+    elif isinstance(data, list):
+        for item in data:
+            process_base64_images(item)
+
+    return data
 
 
 # ---------------- CREATE DRUG ----------------
@@ -106,20 +180,24 @@ async def create_drug(request: Request, user: dict = Depends(get_current_user)):
             detail=f"JSON validation error: {str(validation_error)[:200]}"
         )
 
-    # 3️⃣ Extract dynamic files: chemicalStructure_0, appendix5_0, appendix5_1 etc.
+    # 3️⃣ Smart Image Processing (detect Base64 in JSON and save as files)
+    drug_data = process_base64_images(drug_data)
+
+    # 4️⃣ Extract dynamic files: chemicalStructure_0, appendix5_0, appendix5_1 etc.
     # (uploaded_files list is already populated above)
 
     # 4️⃣ File saving config
     ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
     MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB max file
 
-    # Updated field mappings for new schema
-    # Images can be uploaded to:
-    # 1. AnalyticalDevelopment.dosageFormAndStrength[].images
-    # 2. DrugProductInformation.labelingInformation[].image[]
+    # Field mappings for image uploads:
+    # 1. PhysicalChemicalProperties.structure
+    # 2. DrugProductInformation.dosageFormAndStrength[0].images
+    # 3. LabelingInformation.labelingInformation[0].image
     FIELD_MAPPINGS = {
-        "dosageFormImages": ["AnalyticalDevelopment", "dosageFormAndStrength", 0, "images"],
-        "labelingImages": ["DrugProductInformation", "labelingInformation", 0, "image"]
+        "structureImage": ["PhysicalChemicalProperties", "structure"],
+        "dosageFormImages": ["DrugProductInformation", "dosageFormAndStrength", 0, "images"],
+        "labelingImages": ["LabelingInformation", "labelingInformation", 0, "image"]
     }
 
     appendices = {}
@@ -158,7 +236,7 @@ async def create_drug(request: Request, user: dict = Depends(get_current_user)):
             else:
                 data[final_key] = value
 
-    # 5️⃣ Save every uploaded file as Base64 in MongoDB
+    # 5️⃣ Save every uploaded file to local storage and store URL in DB
     for field_name, file in uploaded_files:
 
         if not file.filename:
@@ -172,24 +250,29 @@ async def create_drug(request: Request, user: dict = Depends(get_current_user)):
         if file.content_type not in ALLOWED_TYPES:
             raise HTTPException(400, f"Invalid file type: {file.filename}")
 
-        # Convert to Base64 string
-        encoded_string = base64.b64encode(content).decode("utf-8")
-        base64_image = f"data:{file.content_type};base64,{encoded_string}"
+        # Generate unique filename
+        ext = os.path.splitext(file.filename)[1]
+        unique_filename = f"{uuid.uuid4()}{ext}"
+        file_path = os.path.join("uploads", unique_filename)
+        
+        # Save file to uploads directory
+        with open(file_path, "wb") as f:
+            f.write(content)
+
+        # Create relative URL
+        image_url = f"/uploads/{unique_filename}"
 
         clean_name = field_name
         print(f"[DEBUG] clean_name: {clean_name}")
 
         # Apply mapping for recognized image fields
         if clean_name in FIELD_MAPPINGS:
-            value_to_set = base64_image
-            
-            # Special handling for LabelingInformation images which expects ImageObject
-            if clean_name == "labelingImages":
-                 value_to_set = {
-                     "imageData": base64_image,
-                     "fileName": file.filename,
-                     "contentType": file.content_type
-                 }
+            # Standard ImageObject structure
+            value_to_set = {
+                "imageData": image_url,
+                "fileName": file.filename,
+                "contentType": file.content_type
+            }
             
             print(f"[DEBUG] Setting mapped field {clean_name}")
             set_nested_value(drug_data, FIELD_MAPPINGS[clean_name], value_to_set)
@@ -216,7 +299,8 @@ async def create_drug(request: Request, user: dict = Depends(get_current_user)):
     created_drug = await db.drugs.find_one({"_id": inserted.inserted_id})
     print(f"[DEBUG] Retrieved from DB - _id: {created_drug.get('_id')}")
 
-    response_data = drug_helper(created_drug)
+    base_url = str(request.base_url).rstrip("/")
+    response_data = drug_helper(created_drug, base_url)
     print(f"[DEBUG] After drug_helper - appendices field: {response_data.get('appendices')}")
 
     # Collect URLs
@@ -229,7 +313,7 @@ async def create_drug(request: Request, user: dict = Depends(get_current_user)):
         elif isinstance(obj, list):
             for v in obj:
                 collect_urls(v)
-        elif isinstance(obj, str) and (obj.startswith("http") or obj.startswith("data:image")):
+        elif isinstance(obj, str) and (obj.startswith("http") or obj.startswith("data:image") or obj.startswith("/uploads/")):
             image_urls.append(obj)
 
     collect_urls(response_data)
@@ -260,7 +344,7 @@ async def get_all_drugs(request: Request, skip: int = 0,  user: dict = Depends(g
             elif isinstance(obj, list):
                 for v in obj:
                     collect_urls(v)
-            elif isinstance(obj, str) and (obj.startswith("http") or obj.startswith("data:image")):
+            elif isinstance(obj, str) and (obj.startswith("http") or obj.startswith("data:image") or obj.startswith("/uploads/")):
                 image_urls.append(obj)
 
         collect_urls(response_data)
@@ -285,7 +369,8 @@ async def get_drug(drug_id: str, request: Request, user: dict = Depends(get_curr
     if not drug:
         raise HTTPException(status_code=404, detail="Drug not found")
 
-    response_data = drug_helper(drug)
+    base_url = str(request.base_url).rstrip("/")
+    response_data = drug_helper(drug, base_url)
 
     # Collect URLs from the converted data
     image_urls = []
@@ -296,7 +381,7 @@ async def get_drug(drug_id: str, request: Request, user: dict = Depends(get_curr
         elif isinstance(obj, list):
             for v in obj:
                 collect_urls(v)
-        elif isinstance(obj, str) and (obj.startswith("http") or obj.startswith("data:image")):
+        elif isinstance(obj, str) and (obj.startswith("http") or obj.startswith("data:image") or obj.startswith("/uploads/")):
             image_urls.append(obj)
 
     collect_urls(response_data)
@@ -310,12 +395,15 @@ async def get_drug(drug_id: str, request: Request, user: dict = Depends(get_curr
 
 # ---------------- UPDATE DRUG ----------------
 @drug_router.put("/drugs/{drug_id}", response_model=DrugResponse)
-async def update_drug(drug_id: str, updated_drug: DrugUpdate, user: dict = Depends(get_current_user)):
+async def update_drug(drug_id: str, updated_drug: DrugUpdate, request: Request, user: dict = Depends(get_current_user)):
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid ID")
 
     # Build update data from provided fields
     update_data = updated_drug.model_dump(exclude_unset=True, by_alias=True)
+
+    # Smart Image Processing for updates
+    update_data = process_base64_images(update_data)
 
     if not update_data:
         raise HTTPException(status_code=400, detail="No valid fields to update")
@@ -330,7 +418,8 @@ async def update_drug(drug_id: str, updated_drug: DrugUpdate, user: dict = Depen
 
     updated_doc = await db.drugs.find_one({"_id": ObjectId(drug_id)})
 
-    return DrugResponse(message="Drug updated successfully", data=drug_helper(updated_doc, None))
+    base_url = str(request.base_url).rstrip("/")
+    return DrugResponse(message="Drug updated successfully", data=drug_helper(updated_doc, base_url))
 
 
 # ---------------- DELETE DRUG ----------------
