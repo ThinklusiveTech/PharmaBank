@@ -27,6 +27,7 @@ class DrugUpdate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     cid: Optional[str] = None
+    executive_summary: Optional[str] = Field(None, alias="ExecutiveSummary")
     product_overview: Optional[ProductOverview] = Field(None, alias="ProductOverview")
     physical_chemical_properties: Optional[PhysicalChemicalProperties] = Field(None, alias="PhysicalChemicalProperties")
     regulatory_insights: Optional[RegulatoryInsights] = Field(None, alias="RegulatoryInsights")
