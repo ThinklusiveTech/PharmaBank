@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from typing import List, Optional, Union, Any
 from datetime import datetime
 import calendar
@@ -58,6 +58,18 @@ class ImageObject(BaseModel):
     fileName: Optional[str] = None
     contentType: Optional[str] = None
 
+    @model_validator(mode='before')
+    @classmethod
+    def map_frontend_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Map frontend 'name' to 'fileName'
+            if "name" in data and not data.get("fileName"):
+                data["fileName"] = data["name"]
+            # Map frontend 'type' to 'contentType'
+            if "type" in data and not data.get("contentType"):
+                data["contentType"] = data["type"]
+        return data
+
 
 # ==================== Step 1: Product Overview ====================
 class ProductOverview(BaseModel):
@@ -101,6 +113,13 @@ class PhysicalChemicalProperties(BaseModel):
     logp: Optional[str] = None
     logd: Optional[str] = None
     individualSolvent: Optional[List[IndividualSolvent]] = []
+
+    @field_validator('structure', mode='before')
+    @classmethod
+    def handle_list_structure(cls, v):
+        if isinstance(v, list) and len(v) > 0:
+            return v[0]
+        return v
 
 
 # ==================== Step 3: Regulatory Insights ====================
@@ -220,6 +239,13 @@ class DsImpurity(BaseModel):
     specifiedUnspecifiedImpurities: Optional[str] = None
     image: Optional[Union[ImageObject, str]] = None
 
+    @field_validator('image', mode='before')
+    @classmethod
+    def handle_list_image(cls, v):
+        if isinstance(v, list) and len(v) > 0:
+            return v[0]
+        return v
+
 
 class GenotoxicImpurity(BaseModel):
     genotoxicImpurities: Optional[str] = None
@@ -326,6 +352,13 @@ class LabelingInformationItem(BaseModel):
     # image: accepts a URL string OR an ImageObject (for file/base64 uploads)
     image: Optional[Union[ImageObject, str]] = None
 
+    @field_validator('image', mode='before')
+    @classmethod
+    def handle_list_image(cls, v):
+        if isinstance(v, list) and len(v) > 0:
+            return v[0]
+        return v
+
 
 class LabelingSection(BaseModel):
     labelingInformation: Optional[List[LabelingInformationItem]] = []
@@ -347,6 +380,15 @@ class BaBeStudy(BaseModel):
     studyCondition: Optional[str] = None
     additionalDetails: Optional[str] = None
     endPoint: Optional[str] = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def handle_endpoint_alias(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Handle 'endpoint' vs 'endPoint'
+            if "endpoint" in data and not data.get("endPoint"):
+                data["endPoint"] = data["endpoint"]
+        return data
 
 
 class BaBeStudies(BaseModel):
@@ -386,9 +428,19 @@ class NewDrugData(BaseModel):
 
     @field_validator('*', mode='before')
     @classmethod
-    def validate_empty_objects(cls, v):
+    def deep_robustness_validator(cls, v, info):
+        # 1. Handle empty objects
         if isinstance(v, dict) and not v:
             return None
+            
+        # 2. Handle wrapped strings (e.g., Sources: {"sources": "val"} or {"Sources": "val"})
+        if info.field_name in ['sources', 'glossary', 'executive_summary']:
+            if isinstance(v, dict):
+                # Try to extract a value if any key in the dict matches the field name (case insensitive)
+                for key, val in v.items():
+                    if key.lower() == info.field_name.lower():
+                        return val
+                        
         return v
 
 
