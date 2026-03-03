@@ -384,5 +384,12 @@ class NewDrugData(BaseModel):
     glossary: Optional[str] = Field(None, alias="Glossary")
     appendices: Optional[Appendices] = Field(None, alias="Appendices")
 
+    @field_validator('*', mode='before')
+    @classmethod
+    def validate_empty_objects(cls, v):
+        if isinstance(v, dict) and not v:
+            return None
+        return v
+
 
 NewDrugData.model_rebuild()
