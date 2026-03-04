@@ -14,6 +14,8 @@ services:
       - "8000:8000"
     depends_on:
       - mongo
+    volumes:
+      - ./uploads:/app/uploads
     environment:
       - MONGO_URL=mongodb://mongo:27017
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload --forwarded-allow-ips "*"

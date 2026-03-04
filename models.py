@@ -154,9 +154,6 @@ class SpecialDesignation(BaseModel):
 class DrugPatent(BaseModel):
     designationType: Optional[str] = None
     expiryDate: Optional[Union[int, str]] = None
-    regulatoryBody: Optional[str] = None
-    exclusivityConsideration: Optional[str] = None
-    impactForGenericFilers: Optional[str] = None
 
     @field_validator('expiryDate', mode='before')
     @classmethod
