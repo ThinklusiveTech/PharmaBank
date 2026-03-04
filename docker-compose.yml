@@ -13,6 +13,8 @@ services:
       - "8000:8000"
     depends_on:
       - mongo
+    volumes:
+      - ./uploads:/app/uploads
     environment:
       - MONGO_URL=mongodb://mongo:27017
       - ENVIRONMENT=production  # Add this line

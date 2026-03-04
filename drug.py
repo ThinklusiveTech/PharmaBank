@@ -192,13 +192,23 @@ async def create_drug(request: Request, user: dict = Depends(get_current_user)):
     MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB max file
 
     # Field mappings for image uploads:
-    # 1. PhysicalChemicalProperties.structure
-    # 2. DrugProductInformation.dosageFormAndStrength[0].images
-    # 3. LabelingInformation.labelingInformation[0].image
+    # Allows frontend to send files with common keys like 'structure', 'image', 'images'
     FIELD_MAPPINGS = {
+        # Structure
+        "structure": ["PhysicalChemicalProperties", "structure"],
         "structureImage": ["PhysicalChemicalProperties", "structure"],
+        "chemicalStructure": ["PhysicalChemicalProperties", "structure"],
+        
+        # Dosage Form Images (Targeting the first dosage form in the list)
+        "images": ["DrugProductInformation", "dosageFormAndStrength", 0, "images"],
         "dosageFormImages": ["DrugProductInformation", "dosageFormAndStrength", 0, "images"],
-        "labelingImages": ["LabelingInformation", "labelingInformation", 0, "image"]
+        
+        # Labeling Images (Targeting the first labeling item)
+        "image": ["LabelingInformation", "labelingInformation", 0, "image"],
+        "labelingImages": ["LabelingInformation", "labelingInformation", 0, "image"],
+        
+        # Impurity Image (Targeting the first impurity)
+        "impurityImage": ["DrugSubstance", "dsImpurities", 0, "image"]
     }
 
     appendices = {}
