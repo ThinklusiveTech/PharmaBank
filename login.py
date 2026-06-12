@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from models import Users, ForgotPasswordRequest
 from database import db
-from jwt_handler import create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, decode_token
+from jwt_handler import create_access_token, get_current_user, require_roles, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, decode_token
 from hashing import get_password_hash, verify_password
 from typing import Optional
 from bson import ObjectId
@@ -130,7 +130,7 @@ async def forgot_password(request: ForgotPasswordRequest):
 
 # ---------------- Get All Users OR Specific User by ID ----------------
 @login_router.get("/allusers")
-async def read_users(user_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+async def read_users(user_id: Optional[str] = None, current_user: dict = Depends(require_roles(["admin"]))):
     if user_id:
         if not ObjectId.is_valid(user_id):
             raise HTTPException(status_code=400, detail="Invalid user ID format")
@@ -149,7 +149,7 @@ async def read_users(user_id: Optional[str] = None, current_user: dict = Depends
 
 # ---------------- Get User by ID ----------------
 @login_router.get("/user/{user_id}")
-async def get_user_by_id(user_id: str, current_user: dict = Depends(get_current_user)):
+async def get_user_by_id(user_id: str, current_user: dict = Depends(require_roles(["admin"]))):
     if not ObjectId.is_valid(user_id):
         raise HTTPException(status_code=400, detail="Invalid user ID")
     user = await db.users.find_one({"_id": ObjectId(user_id)}, {"password": 0})
@@ -160,7 +160,7 @@ async def get_user_by_id(user_id: str, current_user: dict = Depends(get_current_
 
 # ---------------- Delete User by ID ----------------
 @login_router.delete("/user/{user_id}")
-async def delete_user(user_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_user(user_id: str, current_user: dict = Depends(require_roles(["admin"]))):
     if not ObjectId.is_valid(user_id):
         raise HTTPException(status_code=400, detail="Invalid user ID")
     result = await db.users.delete_one({"_id": ObjectId(user_id)})

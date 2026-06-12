@@ -11,7 +11,7 @@ from models import (
 )
 from database import db
 from pydantic import BaseModel, Field, ConfigDict
-from jwt_handler import get_current_user
+from jwt_handler import get_current_user, require_roles
 import json
 import os
 import uuid
@@ -131,7 +131,7 @@ def process_base64_images(data):
 
 # ---------------- CREATE DRUG ----------------
 @drug_router.post("/drugs/", response_model=DrugResponse)
-async def create_drug(request: Request, user: dict = Depends(get_current_user)):
+async def create_drug(request: Request, user: dict = Depends(require_roles(["editor"]))):
     """Handles JSON form + dynamic file uploads + path building"""
     
     # Check Content-Type
@@ -338,7 +338,7 @@ async def create_drug(request: Request, user: dict = Depends(get_current_user)):
 
 # ---------------- GET ALL DRUGS ----------------
 @drug_router.get("/drugs/", response_model=DrugListResponse)
-async def get_all_drugs(request: Request, skip: int = 0,  user: dict = Depends(get_current_user)):
+async def get_all_drugs(request: Request, skip: int = 0,  user: dict = Depends(require_roles(["subscriber"]))):
     drugs = []
     base_url = str(request.base_url).rstrip("/")
     cursor = db.drugs.find().skip(skip)
@@ -372,7 +372,7 @@ async def get_all_drugs(request: Request, skip: int = 0,  user: dict = Depends(g
 
 # ---------------- GET SINGLE DRUG ----------------
 @drug_router.get("/drugs/{drug_id}", response_model=DrugResponse)
-async def get_drug(drug_id: str, request: Request, user: dict = Depends(get_current_user)):
+async def get_drug(drug_id: str, request: Request, user: dict = Depends(require_roles(["subscriber"]))):
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid ID")
 
@@ -406,7 +406,7 @@ async def get_drug(drug_id: str, request: Request, user: dict = Depends(get_curr
 
 # ---------------- UPDATE DRUG ----------------
 @drug_router.put("/drugs/{drug_id}", response_model=DrugResponse)
-async def update_drug(drug_id: str, updated_drug: DrugUpdate, request: Request, user: dict = Depends(get_current_user)):
+async def update_drug(drug_id: str, updated_drug: DrugUpdate, request: Request, user: dict = Depends(require_roles(["editor"]))):
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid ID")
 
@@ -435,7 +435,7 @@ async def update_drug(drug_id: str, updated_drug: DrugUpdate, request: Request, 
 
 # ---------------- DELETE DRUG ----------------
 @drug_router.delete("/drugs/{drug_id}", response_model=MessageResponse)
-async def delete_drug(drug_id: str, user: dict = Depends(get_current_user)):
+async def delete_drug(drug_id: str, user: dict = Depends(require_roles(["admin"]))):
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid ID")
 

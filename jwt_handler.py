@@ -1,5 +1,5 @@
 import os
-from fastapi import HTTPException, Header
+from fastapi import HTTPException, Header, Depends
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
@@ -53,5 +53,33 @@ async def get_current_user(authorization: str = Header(None)):
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return user_helper(user)
+
+
+# ---------------- Role-Based Access Control ----------------
+def require_roles(allowed_roles: list):
+    async def dependency(current_user: dict = Depends(get_current_user)):
+        user_roles = current_user.get("roles", [])
+        normalized_roles = [r.lower() for r in user_roles]
+        
+        # Expand user's roles based on hierarchy: Admin > Editor > Subscriber/User
+        expanded_roles = set(normalized_roles)
+        if "admin" in expanded_roles:
+            expanded_roles.update(["editor", "subscriber", "user"])
+        if "editor" in expanded_roles:
+            expanded_roles.update(["subscriber", "user"])
+        if "user" in expanded_roles or "subscriber" in expanded_roles:
+            expanded_roles.update(["subscriber", "user"])
+            
+        check_roles = {r.lower() for r in allowed_roles}
+        if "subscriber" in check_roles or "user" in check_roles:
+            check_roles.update(["subscriber", "user"])
+            
+        if not check_roles.intersection(expanded_roles):
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have permission to access this resource"
+            )
+        return current_user
+    return dependency
 
 
