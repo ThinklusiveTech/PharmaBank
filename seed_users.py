@@ -5,16 +5,16 @@ from hashing import get_password_hash
 async def seed_users():
     test_users = [
         {
-            "name": "Test Subscriber",
-            "email": "subscriber@chembank.com",
-            "password": "subscriber123",
-            "roles": ["subscriber"]
+            "name": "Test Development User",
+            "email": "development@chembank.com",
+            "password": "development123",
+            "roles": ["development"]
         },
         {
-            "name": "Test Editor",
-            "email": "editor@chembank.com",
-            "password": "editor123",
-            "roles": ["editor"]
+            "name": "Test Editorial User",
+            "email": "editorial@chembank.com",
+            "password": "editorial123",
+            "roles": ["editorial"]
         },
         {
             "name": "Test Admin",
