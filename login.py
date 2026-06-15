@@ -149,9 +149,16 @@ async def read_users(user_id: Optional[str] = None, current_user: dict = Depends
 
 # ---------------- Get User by ID ----------------
 @login_router.get("/user/{user_id}")
-async def get_user_by_id(user_id: str, current_user: dict = Depends(require_roles(["admin"]))):
+async def get_user_by_id(user_id: str, current_user: dict = Depends(get_current_user)):
     if not ObjectId.is_valid(user_id):
         raise HTTPException(status_code=400, detail="Invalid user ID")
+
+    # Allow if user is admin, OR if the user is fetching their own profile
+    user_roles = current_user.get("roles", [])
+    is_admin = "admin" in [r.lower() for r in user_roles]
+    if not is_admin and current_user.get("_id") != user_id:
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource")
+
     user = await db.users.find_one({"_id": ObjectId(user_id)}, {"password": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
