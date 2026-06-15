@@ -8,6 +8,7 @@ def handle_date_field(v):
     """
     Converts various date string formats or numeric timestamps to Unix timestamp (int).
     Supported: DD-MM-YYYY, YYYY-MM-DD, DD/MM/YYYY, YYYY/MM/DD, DD.MM.YYYY, YYYY.MM.DD
+    Supports lists recursively.
     """
     if v is None or v == "":
         return None
@@ -26,6 +27,9 @@ def handle_date_field(v):
                 return calendar.timegm(dt.timetuple())
             except ValueError:
                 continue
+        return v
+    if isinstance(v, list):
+        return [handle_date_field(item) for item in v]
     return v
 
 
@@ -82,7 +86,7 @@ class ProductOverview(BaseModel):
     firstApprovedDate: Optional[Union[int, str]] = None
     firstApprovedRegion: Optional[str] = None
     dosageForms: Optional[str] = None
-    lossOfExclusivity: Optional[Union[int, str]] = None
+    lossOfExclusivity: Optional[Union[List[Any], int, str]] = None
     globalAnnualRevenue: Optional[str] = None
 
     @field_validator('firstApprovedDate', 'lossOfExclusivity', mode='before')
@@ -254,7 +258,7 @@ class DrugSubstance(BaseModel):
     manufacturingRoutes: Optional[List[ManufacturingRoute]] = []
     dsImpurities: Optional[List[DsImpurity]] = []
     genotoxicImpurities: Optional[List[GenotoxicImpurity]] = []
-    stability: Optional[str] = None
+    stability: Optional[Union[List[Any], str]] = []
     nitrosaminesAssessment: Optional[str] = None
     otherInformation: Optional[str] = None
     regulatoryStartingMaterials: Optional[str] = None
@@ -337,7 +341,7 @@ class DrugProductInformation(BaseModel):
     dissolutionStudies: Optional[List[DissolutionStudy]] = []
     pharmacokinetics: Optional[List[Pharmacokinetics]] = []
     formulationChallenges: Optional[str] = None
-    stabilityStudies: Optional[str] = None
+    stabilityStudies: Optional[Union[List[Any], str]] = []
     maximumDailyDose: Optional[str] = None
     excipientsGrade: Optional[str] = None
     storageAndShippingConditions: Optional[str] = None

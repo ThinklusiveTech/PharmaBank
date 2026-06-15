@@ -32,7 +32,7 @@ class MarketInformation(BaseModel):
         return handle_date_field(v)
 
 class DrugUpdate(BaseModel):
-    MarketInformation: Optional[MarketInformation] = None
+    market_information: Optional[MarketInformation] = Field(None, alias="MarketInformation")
 
 print("--- Testing Various Formats ---")
 formats_to_test = [
@@ -56,7 +56,7 @@ data = {
     }
 }
 update = DrugUpdate(**data)
-dump = update.model_dump(exclude_unset=True)
+dump = update.model_dump(exclude_unset=True, by_alias=True)
 print("Model Dump (Update):", dump)
 assert isinstance(dump["MarketInformation"]["firstApprovedDate"], int)
 
@@ -66,7 +66,7 @@ data_slash = {
     }
 }
 update_slash = DrugUpdate(**data_slash)
-dump_slash = update_slash.model_dump(exclude_unset=True)
+dump_slash = update_slash.model_dump(exclude_unset=True, by_alias=True)
 print("Model Dump (Update with Slash):", dump_slash)
 assert isinstance(dump_slash["MarketInformation"]["firstApprovedDate"], int)
 

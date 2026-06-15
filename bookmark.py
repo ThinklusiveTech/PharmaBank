@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from bson import ObjectId
 from database import db
-from jwt_handler import get_current_user
+from jwt_handler import get_current_user, require_roles
 from pydantic import BaseModel, ConfigDict
 from typing import Dict, List, Any
 
@@ -33,7 +33,7 @@ def drug_helper(drug) -> dict:
     return drug
 
 @bookmark_router.post("/bookmarks/", response_model=BookmarkResponse)
-async def bookmark_drug(request: BookmarkRequest, user: dict = Depends(get_current_user)):
+async def bookmark_drug(request: BookmarkRequest, user: dict = Depends(require_roles(["subscriber"]))):
     drug_id = request.drugId
     print(f"Received bookmark request for drug_id: {drug_id}, user: {user['_id']}")
     if not ObjectId.is_valid(drug_id):
@@ -65,7 +65,7 @@ async def bookmark_drug(request: BookmarkRequest, user: dict = Depends(get_curre
 
 
 @bookmark_router.get("/bookmarks/", response_model=BookmarkListResponse)
-async def get_bookmarked_drugs(skip: int = 0, limit: int = 10, user: dict = Depends(get_current_user)):
+async def get_bookmarked_drugs(skip: int = 0, limit: int = 10, user: dict = Depends(require_roles(["subscriber"]))):
     bookmarks = []
     cursor = db.bookmarks.find({"user_id": str(user["_id"])}).skip(skip).limit(limit)
     async for bookmark in cursor:
@@ -75,7 +75,7 @@ async def get_bookmarked_drugs(skip: int = 0, limit: int = 10, user: dict = Depe
     return BookmarkListResponse(message="Bookmarked drugs retrieved successfully", total_bookmarks=len(bookmarks), data=bookmarks) 
 
 @bookmark_router.delete("/bookmarks/{drug_id}", response_model=MessageResponse)
-async def unbookmark_drug(drug_id: str, user: dict = Depends(get_current_user)):
+async def unbookmark_drug(drug_id: str, user: dict = Depends(require_roles(["subscriber"]))):
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid drug ID")
 
