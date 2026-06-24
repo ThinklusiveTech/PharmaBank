@@ -4,7 +4,7 @@ from models import Users, ForgotPasswordRequest
 from database import db
 from jwt_handler import create_access_token, get_current_user, require_roles, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, decode_token
 from hashing import get_password_hash, verify_password
-from typing import Optional
+from typing import Optional, List
 from bson import ObjectId
 from datetime import timedelta
 
@@ -17,6 +17,9 @@ class LoginRequest(BaseModel):
 class RefreshRequest(BaseModel):
     refresh_token: str
 
+class UserRoleUpdate(BaseModel):
+    roles: List[str]
+
 # ---------------- Register User ----------------
 @login_router.post("/register")
 async def register_user(user: Users):
@@ -26,6 +29,7 @@ async def register_user(user: Users):
     hashed_password = get_password_hash(user.password)
     user_dict = user.dict()
     user_dict["password"] = hashed_password
+    user_dict["roles"] = ["subscriber"]
     result = await db.users.insert_one(user_dict)
     new_user = await db.users.find_one({"_id": result.inserted_id}, {"password": 0})
     new_user["_id"] = str(new_user["_id"])
@@ -174,4 +178,25 @@ async def delete_user(user_id: str, current_user: dict = Depends(require_roles([
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
     return {"message": f"User with ID {user_id} deleted successfully"}
+
+# ---------------- Update User Roles by ID ----------------
+@login_router.put("/user/{user_id}")
+async def update_user_roles(
+    user_id: str,
+    role_update: UserRoleUpdate,
+    current_user: dict = Depends(require_roles(["admin"]))
+):
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+    
+    update_result = await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"roles": role_update.roles}}
+    )
+    if update_result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    updated_user = await db.users.find_one({"_id": ObjectId(user_id)}, {"password": 0})
+    updated_user["_id"] = str(updated_user["_id"])
+    return {"message": "User roles updated successfully", "data": updated_user}
 

@@ -1,7 +1,11 @@
 import os
 import logging
+from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import ServerSelectionTimeoutError
+
+# Load environment variables
+load_dotenv()
 
 # ---------------- Configuration ----------------
 # Allow full Mongo URL from environment or fallback to host/port style

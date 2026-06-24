@@ -445,3 +445,69 @@ async def delete_drug(drug_id: str, user: dict = Depends(require_roles(["admin"]
         raise HTTPException(status_code=404, detail="Drug not found")
 
     return {"message": f"Drug with ID {drug_id} deleted successfully"}
+
+
+# ---------------- SEARCH HISTORY ENDPOINTS ----------------
+class SearchHistoryRequest(BaseModel):
+    query: str
+
+@drug_router.post("/searchhistory", response_model=MessageResponse)
+async def create_search_history(
+    request_data: SearchHistoryRequest,
+    user: dict = Depends(require_roles(["subscriber"]))
+):
+    normalized = request_data.query.strip()
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Search query cannot be empty")
+        
+    existing = await db.search_history.find_one({"query_lower": normalized.lower()})
+    if existing:
+        await db.search_history.update_one(
+            {"_id": existing["_id"]},
+            {"$inc": {"count": 1}}
+        )
+    else:
+        await db.search_history.insert_one({
+            "query": normalized,
+            "query_lower": normalized.lower(),
+            "count": 1
+        })
+        
+    return {"message": "Search history updated successfully"}
+
+@drug_router.get("/searchhistory")
+async def get_popular_searches(
+    request: Request,
+    user: dict = Depends(require_roles(["subscriber"]))
+):
+    cursor = db.search_history.find().sort("count", -1).limit(7)
+    results = []
+    async for doc in cursor:
+        results.append(doc["query"])
+        
+    # If fewer than 7 searches, pad with actual drug names from the drugs collection
+    if len(results) < 7:
+        drug_cursor = db.drugs.find().limit(15)
+        async for drug in drug_cursor:
+            name = None
+            po = drug.get("ProductOverview")
+            if po and isinstance(po, dict):
+                name = po.get("drugName") or po.get("brandName")
+            if not name:
+                name = drug.get("drugName")
+            if name and isinstance(name, str) and name.strip():
+                clean_name = name.strip()
+                if clean_name not in results:
+                    results.append(clean_name)
+                    if len(results) >= 7:
+                        break
+                        
+    # If still fewer than 7 (e.g. empty database), pad with default values
+    fallbacks = ['Aspirin', 'Amoxicillin', 'Metformin', 'Sitagliptin', 'Pomalidomide', 'Voriconazole', 'Paracetamol']
+    for fb in fallbacks:
+        if len(results) >= 7:
+            break
+        if fb not in results:
+            results.append(fb)
+            
+    return {"message": "Popular searches retrieved", "data": results}
