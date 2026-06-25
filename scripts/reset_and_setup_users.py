@@ -1,8 +1,12 @@
 import asyncio
-from database import db
-from hashing import get_password_hash
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-async def clean_and_seed_users():
+from app.database import db
+from app.hashing import get_password_hash
+
+async def reset_and_setup_users():
     # 1. Clear users and refresh tokens
     print("Clearing users and refresh_tokens collections...")
     await db.users.delete_many({})
@@ -30,7 +34,7 @@ async def clean_and_seed_users():
         }
     ]
 
-    # 3. Seed users into DB
+    # 3. Create users in DB
     for user_info in standard_users:
         print(f"Creating user {user_info['email']} with role {user_info['roles']}...")
         hashed_pwd = get_password_hash(user_info["password"])
@@ -42,7 +46,7 @@ async def clean_and_seed_users():
         }
         await db.users.insert_one(user_data)
             
-    print("Database users collection cleaned and standard roles seeded successfully!")
+    print("Database users collection reset and standard roles setup successfully!")
 
 if __name__ == "__main__":
-    asyncio.run(clean_and_seed_users())
+    asyncio.run(reset_and_setup_users())

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from bson import ObjectId
-from database import db
-from jwt_handler import get_current_user, require_roles
+from app.database import db
+from app.jwt_handler import get_current_user, require_roles
 from pydantic import BaseModel, ConfigDict
 from typing import Dict, List, Any
 

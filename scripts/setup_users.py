@@ -1,20 +1,24 @@
 import asyncio
-from database import db
-from hashing import get_password_hash
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-async def seed_rbac_users():
+from app.database import db
+from app.hashing import get_password_hash
+
+async def seed_users():
     test_users = [
         {
-            "name": "Test Subscriber",
-            "email": "subscriber@chembank.com",
-            "password": "subscriber123",
-            "roles": ["subscriber"]
+            "name": "Test Development User",
+            "email": "development@chembank.com",
+            "password": "development123",
+            "roles": ["development"]
         },
         {
-            "name": "Test Editor",
-            "email": "editor@chembank.com",
-            "password": "editor123",
-            "roles": ["editor"]
+            "name": "Test Editorial User",
+            "email": "editorial@chembank.com",
+            "password": "editorial123",
+            "roles": ["editorial"]
         },
         {
             "name": "Test Admin",
@@ -24,7 +28,7 @@ async def seed_rbac_users():
         }
     ]
 
-    print("Seeding test_rbac users into MongoDB...")
+    print("Seeding test users into MongoDB...")
     for user_info in test_users:
         existing = await db.users.find_one({"email": user_info["email"]})
         if existing:
@@ -48,6 +52,4 @@ async def seed_rbac_users():
     print("Database seeding completed successfully!")
 
 if __name__ == "__main__":
-    asyncio.run(seed_rbac_users())
-
-
+    asyncio.run(seed_users())

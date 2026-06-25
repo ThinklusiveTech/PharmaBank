@@ -1,9 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from models import Users, ForgotPasswordRequest
-from database import db
-from jwt_handler import create_access_token, get_current_user, require_roles, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, decode_token
-from hashing import get_password_hash, verify_password
+from app.models import Users, ForgotPasswordRequest
+from app.database import db
+from app.jwt_handler import create_access_token, get_current_user, require_roles, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, decode_token
+from app.hashing import get_password_hash, verify_password
 from typing import Optional, List
 from bson import ObjectId
 from datetime import timedelta

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Request, Response
 from bson import ObjectId
 from typing import Optional, List, Dict, Any
-from models import (
+from app.models import (
     NewDrugData,
     ProductOverview, PhysicalChemicalProperties,
     RegulatoryInsights, GenericEntrants,
@@ -9,9 +9,9 @@ from models import (
     LabelingSection, BaBeStudies,
     Appendices
 )
-from database import db
+from app.database import db
 from pydantic import BaseModel, Field, ConfigDict
-from jwt_handler import get_current_user, require_roles
+from app.jwt_handler import get_current_user, require_roles
 import json
 import os
 import uuid

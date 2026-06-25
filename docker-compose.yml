@@ -18,6 +18,6 @@ services:
     environment:
       - MONGO_URL=mongodb://mongo:27017
       - ENVIRONMENT=production  # Add this line
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload --forwarded-allow-ips "*"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --forwarded-allow-ips "*"
 volumes:
   mongo-data: {}
