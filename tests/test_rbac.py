@@ -48,7 +48,7 @@ def run_tests():
     env["MONGO_URL"] = "mongodb://localhost:27017"
     
     server_process = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "main:app", "--port", PORT],
+        [sys.executable, "-m", "uvicorn", "app.main:app", "--port", PORT],
         cwd=".",
         env=env,
         stdout=subprocess.DEVNULL,

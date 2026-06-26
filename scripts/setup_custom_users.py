@@ -1,6 +1,10 @@
 import asyncio
-from database import db
-from hashing import get_password_hash
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from app.database import db
+from app.hashing import get_password_hash
 
 async def seed_custom_users():
     custom_users = [

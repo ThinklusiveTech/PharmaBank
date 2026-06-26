@@ -3,8 +3,8 @@ from fastapi import HTTPException, Header, Depends
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
-from database import db
-from handlers import user_helper
+from app.database import db
+from app.handlers.helpers import user_helper
 from bson import ObjectId
 
 

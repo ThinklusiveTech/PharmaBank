@@ -1,5 +1,9 @@
 import json
-from models import NewDrugData
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from app.models import NewDrugData
 
 aspirin_data = {
   "ExecutiveSummary": "Aspirin (acetylsalicylic acid) is a widely used analgesic...",

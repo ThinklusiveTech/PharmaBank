@@ -1,9 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from login import login_router
-from drug import drug_router
-from bookmark import bookmark_router
+from app.handlers.login import login_router
+from app.handlers.drug import drug_router
+from app.handlers.bookmark import bookmark_router
 from fastapi.responses import FileResponse
 import os
 

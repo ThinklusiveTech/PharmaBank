@@ -43,7 +43,7 @@ class Users(BaseModel):
     name: str
     email: str
     password: str
-    roles: Optional[List[str]] = ["user"]
+    roles: Optional[List[str]] = ["subscriber"]
 
 
 class ForgotPasswordRequest(BaseModel):
