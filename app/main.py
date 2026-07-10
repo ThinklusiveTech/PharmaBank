@@ -13,18 +13,31 @@ app = FastAPI()
 
 # CORS configuration
 environment = os.getenv("ENVIRONMENT", "development")
-if environment == "production":
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS")
+
+if allowed_origins_env:
+    origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+elif environment == "production":
     origins = [
         "https://cmcintel.com",
-        "http://localhost:3004",  # Allow localhost for testing
+        "http://localhost:3000",  # Docker port mapping (used in docker-compose)
+        "http://localhost:3004",  # Vite local dev port
+        "http://localhost:5173",  # Vite default/fallback dev port
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3004",
+        "http://127.0.0.1:5173",
     ]
 else:
     origins = ["*"]  # Allow all origins in development
 
+# Allow credentials only if we are using explicit origins (non-wildcard)
+allow_credentials = "*" not in origins
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=False,
+    allow_origin_regex=r"https://(.*\.)?cmcintel\.com",
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
