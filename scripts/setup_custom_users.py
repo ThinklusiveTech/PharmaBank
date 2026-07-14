@@ -15,15 +15,15 @@ async def seed_custom_users():
             "roles": ["admin"]
         },
         {
-            "name": "ChemBank Editorial",
-            "email": "editorial@chembank.com",
-            "password": "Editorial123!",
+            "name": "ChemBank Editor",
+            "email": "editor@chembank.com",
+            "password": "Editor123!",
             "roles": ["editor"]
         },
         {
-            "name": "ChemBank Developer",
-            "email": "developer@chembank.com",
-            "password": "Develop123!",
+            "name": "ChemBank Subscriber",
+            "email": "subscriber@chembank.com",
+            "password": "Subscriber123!",
             "roles": ["subscriber"]
         }
     ]
