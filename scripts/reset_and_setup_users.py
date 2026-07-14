@@ -17,19 +17,19 @@ async def reset_and_setup_users():
         {
             "name": "Test Admin",
             "email": "admin@chembank.com",
-            "password": "admin123",
+            "password": "admin@chembank.com",
             "roles": ["admin"]
         },
         {
             "name": "Test Editor",
             "email": "editor@chembank.com",
-            "password": "editor123",
+            "password": "editor@chembank.com",
             "roles": ["editor"]
         },
         {
             "name": "Test Subscriber",
             "email": "subscriber@chembank.com",
-            "password": "subscriber123",
+            "password": "subscriber@chembank.com",
             "roles": ["subscriber"]
         }
     ]

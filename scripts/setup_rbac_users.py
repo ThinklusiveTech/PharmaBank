@@ -9,10 +9,10 @@ from app.hashing import get_password_hash
 async def seed_rbac_users():
     test_users = [
         {
-            "name": "Test Subscriber",
-            "email": "subscriber@chembank.com",
-            "password": "subscriber123",
-            "roles": ["subscriber"]
+            "name": "Test Admin",
+            "email": "admin@chembank.com",
+            "password": "admin123",
+            "roles": ["admin"]
         },
         {
             "name": "Test Editor",
@@ -21,10 +21,10 @@ async def seed_rbac_users():
             "roles": ["editor"]
         },
         {
-            "name": "Test Admin",
-            "email": "admin@chembank.com",
-            "password": "admin123",
-            "roles": ["admin"]
+            "name": "Test Subscriber",
+            "email": "subscriber@chembank.com",
+            "password": "subscriber123",
+            "roles": ["subscriber"]
         }
     ]
 
