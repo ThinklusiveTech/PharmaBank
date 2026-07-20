@@ -38,37 +38,44 @@ async def register_user(user: Users):
 # ---------------- Login ----------------
 @login_router.post("/login")
 async def login_for_access_token(form_data: LoginRequest):
-    user = await db.users.find_one({"email": form_data.email})
-    if not user or not verify_password(form_data.password, user["password"]):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    access_token = create_access_token(
-        data={"sub": str(user["_id"])},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    refresh_token = create_refresh_token(
-        data={"sub": str(user["_id"])}
-    )
+    try:
+        user = await db.users.find_one({"email": form_data.email})
+        if not user or "password" not in user or not verify_password(form_data.password, user["password"]):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        access_token = create_access_token(
+            data={"sub": str(user["_id"])},
+            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        )
+        refresh_token = create_refresh_token(
+            data={"sub": str(user["_id"])}
+        )
 
-    # Store refresh token in DB
-    from datetime import datetime
-    await db.refresh_tokens.insert_one({
-        "user_id": str(user["_id"]),
-        "token": refresh_token,
-        "created_at": datetime.utcnow()
-    })
+        # Store refresh token in DB
+        from datetime import datetime
+        await db.refresh_tokens.insert_one({
+            "user_id": str(user["_id"]),
+            "token": refresh_token,
+            "created_at": datetime.utcnow()
+        })
 
-    user_data = {
-        "id": str(user["_id"]),
-        "name": user["name"],
-        "email": user["email"],
-        "roles": user.get("roles", ["admin"])
-    }
-    return {
-        "message": "User Login successfully",
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "data": user_data
-    }
+        user_data = {
+            "id": str(user["_id"]),
+            "name": user.get("name") or user.get("username") or (user.get("email") or "").split("@")[0],
+            "email": user.get("email", ""),
+            "roles": user.get("roles", ["subscriber"])
+        }
+        return {
+            "message": "User Login successfully",
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "data": user_data
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in login: {e}")
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 @login_router.post("/refresh")
 async def refresh_access_token(request: RefreshRequest):
