@@ -6,10 +6,61 @@ from app.handlers.drug import drug_router
 from app.handlers.bookmark import bookmark_router
 from app.handlers.draft import draft_router
 from fastapi.responses import FileResponse
+from contextlib import asynccontextmanager
 import os
 
 
-app = FastAPI()
+async def ensure_default_users():
+    """Ensure standard system users automatically exist in MongoDB on startup"""
+    from app.database import db
+    from app.hashing import get_password_hash
+
+    default_users = [
+        {
+            "name": "ChemBank Admin",
+            "email": "admin@chembank.com",
+            "password": "Admin123!",
+            "roles": ["admin"]
+        },
+        {
+            "name": "ChemBank Editor",
+            "email": "editor@chembank.com",
+            "password": "Editor123!",
+            "roles": ["editor"]
+        },
+        {
+            "name": "ChemBank Subscriber",
+            "email": "subscriber@chembank.com",
+            "password": "Subscriber123!",
+            "roles": ["subscriber"]
+        }
+    ]
+
+    for u in default_users:
+        existing = await db.users.find_one({"email": u["email"]})
+        if not existing:
+            hashed_pwd = get_password_hash(u["password"])
+            user_data = {
+                "name": u["name"],
+                "email": u["email"],
+                "password": hashed_pwd,
+                "roles": u["roles"]
+            }
+            await db.users.insert_one(user_data)
+            print(f"✅ Auto-created missing default user: {u['email']}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup actions
+    try:
+        await ensure_default_users()
+    except Exception as e:
+        print(f"⚠️ Error ensuring default users on startup: {e}")
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 # CORS configuration
 environment = os.getenv("ENVIRONMENT", "development")
@@ -41,8 +92,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
 
 app.include_router(login_router, prefix="/v1")
 app.include_router(drug_router, prefix="/v1")
