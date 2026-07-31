@@ -19,22 +19,29 @@ async def ensure_default_users():
         {
             "name": "ChemBank Admin",
             "email": "admin@chembank.com",
-            "password": "Admin123!",
-            "roles": ["admin"]
+            "password": "admin123",
+            "roles": ["admin"],
+            "status": "active",
+            "isActive": True
         },
         {
             "name": "ChemBank Editor",
             "email": "editor@chembank.com",
-            "password": "Editor123!",
-            "roles": ["editor"]
+            "password": "editor123",
+            "roles": ["editor"],
+            "status": "active",
+            "isActive": True
         },
         {
             "name": "ChemBank Subscriber",
             "email": "subscriber@chembank.com",
-            "password": "Subscriber123!",
-            "roles": ["subscriber"]
+            "password": "subscriber123",
+            "roles": ["subscriber"],
+            "status": "active",
+            "isActive": True
         }
     ]
+
 
     for u in default_users:
         existing = await db.users.find_one({"email": u["email"]})
