@@ -2,13 +2,19 @@ services:
   mongo:
     image: mongo:6
     container_name: chembank-mongo
+    restart: unless-stopped
     ports:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
+
   fastapi:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: chembank-api
+    restart: unless-stopped
+    init: true
     ports:
       - "8000:8000"
     depends_on:
@@ -16,8 +22,17 @@ services:
     volumes:
       - ./uploads:/app/uploads
     environment:
-      - MONGO_URL=mongodb://mongo:27017
-      - ENVIRONMENT=production  # Add this line
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --forwarded-allow-ips "*"
+      MONGO_URL: mongodb://mongo:27017
+      ENVIRONMENT: production
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --forwarded-allow-ips
+      - "*"
+
 volumes:
-  mongo-data: {}
+  mongo-data:

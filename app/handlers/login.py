@@ -17,8 +17,11 @@ class LoginRequest(BaseModel):
 class RefreshRequest(BaseModel):
     refresh_token: str
 
-class UserRoleUpdate(BaseModel):
-    roles: List[str]
+class UserUpdate(BaseModel):
+    roles: Optional[List[str]] = None
+    status: Optional[str] = None
+    isActive: Optional[bool] = None
+    is_active: Optional[bool] = None
 
 # ---------------- Register User ----------------
 @login_router.post("/register")
@@ -30,6 +33,8 @@ async def register_user(user: Users):
     user_dict = user.dict()
     user_dict["password"] = hashed_password
     user_dict["roles"] = ["subscriber"]
+    user_dict["status"] = "active"
+    user_dict["isActive"] = True
     result = await db.users.insert_one(user_dict)
     new_user = await db.users.find_one({"_id": result.inserted_id}, {"password": 0})
     new_user["_id"] = str(new_user["_id"])
@@ -42,6 +47,17 @@ async def login_for_access_token(form_data: LoginRequest):
         user = await db.users.find_one({"email": form_data.email})
         if not user or "password" not in user or not verify_password(form_data.password, user["password"]):
             raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        # Active / Inactive check
+        raw_status = user.get("status")
+        raw_is_active = user.get("isActive", user.get("is_active"))
+        is_active = (
+            raw_status.lower() == "active" if isinstance(raw_status, str)
+            else bool(raw_is_active) if raw_is_active is not None
+            else True
+        )
+        if not is_active:
+            raise HTTPException(status_code=403, detail="Your account is inactive. Please contact administrator.")
         
         access_token = create_access_token(
             data={"sub": str(user["_id"])},
@@ -63,7 +79,9 @@ async def login_for_access_token(form_data: LoginRequest):
             "id": str(user["_id"]),
             "name": user.get("name") or user.get("username") or (user.get("email") or "").split("@")[0],
             "email": user.get("email", ""),
-            "roles": user.get("roles", ["subscriber"])
+            "roles": user.get("roles", ["subscriber"]),
+            "status": user.get("status", "active"),
+            "isActive": user.get("isActive", True)
         }
         return {
             "message": "User Login successfully",
@@ -186,24 +204,38 @@ async def delete_user(user_id: str, current_user: dict = Depends(require_roles([
         raise HTTPException(status_code=404, detail="User not found")
     return {"message": f"User with ID {user_id} deleted successfully"}
 
-# ---------------- Update User Roles by ID ----------------
+# ---------------- Update User Details by ID ----------------
 @login_router.put("/user/{user_id}")
-async def update_user_roles(
+async def update_user(
     user_id: str,
-    role_update: UserRoleUpdate,
+    user_update: UserUpdate,
     current_user: dict = Depends(require_roles(["admin"]))
 ):
     if not ObjectId.is_valid(user_id):
         raise HTTPException(status_code=400, detail="Invalid user ID")
     
-    update_result = await db.users.update_one(
-        {"_id": ObjectId(user_id)},
-        {"$set": {"roles": role_update.roles}}
-    )
-    if update_result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="User not found")
+    update_data = {}
+    if user_update.roles is not None:
+        update_data["roles"] = user_update.roles
+    if user_update.status is not None:
+        update_data["status"] = user_update.status
+    if user_update.isActive is not None:
+        update_data["isActive"] = user_update.isActive
+    if user_update.is_active is not None:
+        update_data["is_active"] = user_update.is_active
+
+    if update_data:
+        update_result = await db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": update_data}
+        )
+        if update_result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
         
     updated_user = await db.users.find_one({"_id": ObjectId(user_id)}, {"password": 0})
+    if not updated_user:
+        raise HTTPException(status_code=404, detail="User not found")
     updated_user["_id"] = str(updated_user["_id"])
-    return {"message": "User roles updated successfully", "data": updated_user}
+    return {"message": "User updated successfully", "data": updated_user}
+
 
