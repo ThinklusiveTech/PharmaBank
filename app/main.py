@@ -5,6 +5,7 @@ from app.handlers.login import login_router
 from app.handlers.drug import drug_router
 from app.handlers.bookmark import bookmark_router
 from app.handlers.draft import draft_router
+from app.handlers.master_data import master_data_router
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 import os
@@ -104,6 +105,7 @@ app.include_router(login_router, prefix="/v1")
 app.include_router(drug_router, prefix="/v1")
 app.include_router(bookmark_router, prefix="/v1")
 app.include_router(draft_router, prefix="/v1")
+app.include_router(master_data_router, prefix="/v1")
 
 # Create uploads directory if it doesn't exist
 os.makedirs("uploads", exist_ok=True)
