@@ -75,6 +75,18 @@ class ImageObject(BaseModel):
         return data
 
 
+class LossOfExclusivityItem(BaseModel):
+    exclusivityCode: Optional[str] = None
+    country: Optional[str] = None
+    regulatoryBody: Optional[str] = None
+    expiredDate: Optional[Union[int, str]] = None
+
+    @field_validator('expiredDate', mode='before')
+    @classmethod
+    def validate_dates(cls, v):
+        return handle_date_field(v)
+
+
 # ==================== Step 1: Product Overview ====================
 class ProductOverview(BaseModel):
     version: Optional[str] = None
@@ -82,14 +94,18 @@ class ProductOverview(BaseModel):
     apiName: Optional[str] = None
     mechanismOfAction: Optional[str] = None
     companyName: Optional[str] = None
+    therapeuticArea: Optional[str] = None
     approvedIndications: Optional[str] = None
     firstApprovedDate: Optional[Union[int, str]] = None
     firstApprovedRegion: Optional[str] = None
     dosageForms: Optional[str] = None
-    lossOfExclusivity: Optional[Union[List[Any], int, str]] = None
+    lossOfExclusivity: Optional[Union[List[LossOfExclusivityItem], List[Any], str]] = None
     globalAnnualRevenue: Optional[str] = None
+    createdBy: Optional[str] = None
+    createdByEmail: Optional[str] = None
+    createdByName: Optional[str] = None
 
-    @field_validator('firstApprovedDate', 'lossOfExclusivity', mode='before')
+    @field_validator('firstApprovedDate', mode='before')
     @classmethod
     def validate_dates(cls, v):
         return handle_date_field(v)
@@ -126,16 +142,16 @@ class PhysicalChemicalProperties(BaseModel):
         return v
 
 
-# ==================== Step 3: Regulatory Insights ====================
 class RegulatoryApprovalDetail(BaseModel):
     drugName: Optional[str] = None
     region: Optional[str] = None
+    country: Optional[str] = None
     indication: Optional[str] = None
     patientSegments: Optional[str] = None
     dosageForm: Optional[str] = None
     dose: Optional[str] = None
     approvedDate: Optional[Union[int, str]] = None
-    regulatoryBodies: Optional[str] = None
+    regulatoryBodies: Optional[Union[List[str], str]] = None
 
     @field_validator('approvedDate', mode='before')
     @classmethod
@@ -145,6 +161,7 @@ class RegulatoryApprovalDetail(BaseModel):
 
 class SpecialDesignation(BaseModel):
     designationType: Optional[str] = None
+    country: Optional[str] = None
     regulatorBody: Optional[str] = None
     indication: Optional[str] = None
     dateGranted: Optional[Union[int, str]] = None
@@ -262,7 +279,7 @@ class DrugSubstance(BaseModel):
     nitrosaminesAssessment: Optional[str] = None
     otherInformation: Optional[str] = None
     regulatoryStartingMaterials: Optional[str] = None
-    drugSubstanceSpecifications: Optional[str] = None
+    drugSubstanceSpecifications: Optional[Union[List[Any], dict, str]] = None
     stableAndCommerciallyUsedPolymorphicForm: Optional[str] = None
 
 
@@ -411,9 +428,12 @@ class Appendices(BaseModel):
 # Uses snake_case field names with PascalCase aliases so the JSON payload
 # is accepted without Pydantic naming conflicts.
 class NewDrugData(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     cid: Optional[str] = None
+    created_by: Optional[str] = Field(None, alias="createdBy")
+    created_by_email: Optional[str] = Field(None, alias="createdByEmail")
+    created_by_name: Optional[str] = Field(None, alias="createdByName")
     executive_summary: Optional[str] = Field(None, alias="ExecutiveSummary")
     product_overview: Optional[ProductOverview] = Field(None, alias="ProductOverview")
     physical_chemical_properties: Optional[PhysicalChemicalProperties] = Field(None, alias="PhysicalChemicalProperties")
@@ -423,8 +443,8 @@ class NewDrugData(BaseModel):
     drug_product_information: Optional[DrugProductInformation] = Field(None, alias="DrugProductInformation")
     labeling_information: Optional[LabelingSection] = Field(None, alias="LabelingInformation")
     babe_studies: Optional[BaBeStudies] = Field(None, alias="BaBeStudies")
-    sources: Optional[str] = Field(None, alias="Sources")
-    glossary: Optional[str] = Field(None, alias="Glossary")
+    sources: Optional[Union[List[Any], dict, str]] = Field(None, alias="Sources")
+    glossary: Optional[Union[List[Any], dict, str]] = Field(None, alias="Glossary")
     appendices: Optional[Appendices] = Field(None, alias="Appendices")
 
     @field_validator('*', mode='before')

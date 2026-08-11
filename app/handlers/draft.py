@@ -3,6 +3,7 @@ from app.database import db
 from app.jwt_handler import require_roles
 from pydantic import BaseModel
 from typing import Any, Optional
+import time
 from datetime import datetime
 
 draft_router = APIRouter()
@@ -13,19 +14,22 @@ class DraftSaveRequest(BaseModel):
     formData: Any
     currentStep: int
     drugName: Optional[str] = ""
+    lastModified: Optional[int] = None
 
 # ---------------- Routes ----------------
 
 @draft_router.post("/drafts/", response_model=dict)
 async def save_or_update_draft(request: DraftSaveRequest, user: dict = Depends(require_roles(["editor"]))):
     """Save or update a draft report for the authenticated editor"""
+    now_ms = int(time.time() * 1000)
+    timestamp = request.lastModified if request.lastModified else now_ms
     draft_data = {
         "id": request.id,
         "user_id": str(user["_id"]),
         "formData": request.formData,
         "currentStep": request.currentStep,
         "drugName": request.drugName,
-        "lastModified": int(datetime.utcnow().timestamp() * 1000)
+        "lastModified": timestamp
     }
     await db.drafts.update_one(
         {"id": request.id, "user_id": str(user["_id"])},

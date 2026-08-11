@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Request, Response
 from bson import ObjectId
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from app.models import (
     NewDrugData,
     ProductOverview, PhysicalChemicalProperties,
@@ -24,9 +24,12 @@ drug_router = APIRouter()
 
 
 class DrugUpdate(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     cid: Optional[str] = None
+    created_by: Optional[str] = Field(None, alias="createdBy")
+    created_by_email: Optional[str] = Field(None, alias="createdByEmail")
+    created_by_name: Optional[str] = Field(None, alias="createdByName")
     executive_summary: Optional[str] = Field(None, alias="ExecutiveSummary")
     product_overview: Optional[ProductOverview] = Field(None, alias="ProductOverview")
     physical_chemical_properties: Optional[PhysicalChemicalProperties] = Field(None, alias="PhysicalChemicalProperties")
@@ -36,8 +39,8 @@ class DrugUpdate(BaseModel):
     drug_product_information: Optional[DrugProductInformation] = Field(None, alias="DrugProductInformation")
     labeling_information: Optional[LabelingSection] = Field(None, alias="LabelingInformation")
     babe_studies: Optional[BaBeStudies] = Field(None, alias="BaBeStudies")
-    sources: Optional[str] = Field(None, alias="Sources")
-    glossary: Optional[str] = Field(None, alias="Glossary")
+    sources: Optional[Union[List[Any], dict, str]] = Field(None, alias="Sources")
+    glossary: Optional[Union[List[Any], dict, str]] = Field(None, alias="Glossary")
     appendices: Optional[Appendices] = Field(None, alias="Appendices")
 
 
@@ -372,6 +375,7 @@ async def get_all_drugs(request: Request, skip: int = 0,  user: dict = Depends(r
 
 # ---------------- GET SINGLE DRUG ----------------
 @drug_router.get("/drugs/{drug_id}", response_model=DrugResponse)
+@drug_router.get("/drug/{drug_id}", response_model=DrugResponse)
 async def get_drug(drug_id: str, request: Request, user: dict = Depends(require_roles(["subscriber"]))):
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid ID")
@@ -406,9 +410,31 @@ async def get_drug(drug_id: str, request: Request, user: dict = Depends(require_
 
 # ---------------- UPDATE DRUG ----------------
 @drug_router.put("/drugs/{drug_id}", response_model=DrugResponse)
+@drug_router.put("/drug/{drug_id}", response_model=DrugResponse)
 async def update_drug(drug_id: str, updated_drug: DrugUpdate, request: Request, user: dict = Depends(require_roles(["editor"]))):
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid ID")
+
+    existing_drug = await db.drugs.find_one({"_id": ObjectId(drug_id)})
+    if not existing_drug:
+        raise HTTPException(status_code=404, detail="Drug not found")
+
+    user_roles = [str(r).lower() for r in user.get("roles", [])]
+    is_admin = "admin" in user_roles
+    if not is_admin:
+        created_by = (
+            existing_drug.get("createdBy") or
+            existing_drug.get("createdByEmail") or
+            (existing_drug.get("ProductOverview") or {}).get("createdBy") or
+            (existing_drug.get("ProductOverview") or {}).get("createdByEmail")
+        )
+        user_id = str(user.get("_id") or user.get("id") or user.get("sub") or "")
+        user_email = str(user.get("email") or "").lower()
+
+        if created_by:
+            cb_str = str(created_by).lower()
+            if cb_str != user_id.lower() and cb_str != user_email:
+                raise HTTPException(status_code=403, detail="Editors can only edit drugs created by themselves")
 
     # Build update data from provided fields
     update_data = updated_drug.model_dump(exclude_unset=True, by_alias=True)
@@ -424,9 +450,6 @@ async def update_drug(drug_id: str, updated_drug: DrugUpdate, request: Request, 
         {"$set": update_data}
     )
 
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Drug not found")
-
     updated_doc = await db.drugs.find_one({"_id": ObjectId(drug_id)})
 
     base_url = str(request.base_url).rstrip("/")
@@ -435,9 +458,31 @@ async def update_drug(drug_id: str, updated_drug: DrugUpdate, request: Request, 
 
 # ---------------- DELETE DRUG ----------------
 @drug_router.delete("/drugs/{drug_id}", response_model=MessageResponse)
-async def delete_drug(drug_id: str, user: dict = Depends(require_roles(["admin"]))):
+@drug_router.delete("/drug/{drug_id}", response_model=MessageResponse)
+async def delete_drug(drug_id: str, user: dict = Depends(require_roles(["editor"]))):
     if not ObjectId.is_valid(drug_id):
         raise HTTPException(status_code=400, detail="Invalid ID")
+
+    existing_drug = await db.drugs.find_one({"_id": ObjectId(drug_id)})
+    if not existing_drug:
+        raise HTTPException(status_code=404, detail="Drug not found")
+
+    user_roles = [str(r).lower() for r in user.get("roles", [])]
+    is_admin = "admin" in user_roles
+    if not is_admin:
+        created_by = (
+            existing_drug.get("createdBy") or
+            existing_drug.get("createdByEmail") or
+            (existing_drug.get("ProductOverview") or {}).get("createdBy") or
+            (existing_drug.get("ProductOverview") or {}).get("createdByEmail")
+        )
+        user_id = str(user.get("_id") or user.get("id") or user.get("sub") or "")
+        user_email = str(user.get("email") or "").lower()
+
+        if created_by:
+            cb_str = str(created_by).lower()
+            if cb_str != user_id.lower() and cb_str != user_email:
+                raise HTTPException(status_code=403, detail="Editors can only delete drugs created by themselves")
 
     result = await db.drugs.delete_one({"_id": ObjectId(drug_id)})
 
