@@ -58,13 +58,34 @@ async def ensure_default_users():
             print(f"✅ Auto-created missing default user: {u['email']}")
 
 
+async def ensure_master_data():
+    """Ensure master data (countries, regulatory authorities, therapeutic areas) exist in MongoDB on startup"""
+    from app.database import db
+    from scripts.seed_master_data import THERAPEUTIC_AREAS_DATA, REGIONS_COUNTRIES_DATA, REGULATORY_AUTHORITIES_DATA
+
+    if await db.therapeutic_areas.count_documents({}) == 0:
+        ta_docs = [{"area": area, "indications": indications} for area, indications in THERAPEUTIC_AREAS_DATA.items()]
+        await db.therapeutic_areas.insert_many(ta_docs)
+        print(f"✅ Auto-seeded {len(ta_docs)} Therapeutic Areas")
+
+    if await db.regions_countries.count_documents({}) == 0:
+        rc_docs = [{"region": region, "countries": countries} for region, countries in REGIONS_COUNTRIES_DATA.items()]
+        await db.regions_countries.insert_many(rc_docs)
+        print(f"✅ Auto-seeded {len(rc_docs)} Regions & Countries")
+
+    if await db.regulatory_authorities.count_documents({}) == 0:
+        await db.regulatory_authorities.insert_many(REGULATORY_AUTHORITIES_DATA)
+        print(f"✅ Auto-seeded {len(REGULATORY_AUTHORITIES_DATA)} Regulatory Authorities")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup actions
     try:
         await ensure_default_users()
+        await ensure_master_data()
     except Exception as e:
-        print(f"⚠️ Error ensuring default users on startup: {e}")
+        print(f"⚠️ Error during startup initialization: {e}")
     yield
 
 
