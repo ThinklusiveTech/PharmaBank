@@ -10,13 +10,13 @@ from app.models import (
     Appendices
 )
 from app.database import db
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from app.jwt_handler import get_current_user, require_roles
 import json
 import os
 import uuid
 import base64
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 
@@ -30,18 +30,34 @@ class DrugUpdate(BaseModel):
     created_by: Optional[str] = Field(None, alias="createdBy")
     created_by_email: Optional[str] = Field(None, alias="createdByEmail")
     created_by_name: Optional[str] = Field(None, alias="createdByName")
-    executive_summary: Optional[str] = Field(None, alias="ExecutiveSummary")
-    product_overview: Optional[ProductOverview] = Field(None, alias="ProductOverview")
-    physical_chemical_properties: Optional[PhysicalChemicalProperties] = Field(None, alias="PhysicalChemicalProperties")
-    regulatory_insights: Optional[RegulatoryInsights] = Field(None, alias="RegulatoryInsights")
-    generic_entrants: Optional[GenericEntrants] = Field(None, alias="GenericEntrants")
-    drug_substance: Optional[DrugSubstance] = Field(None, alias="DrugSubstance")
-    drug_product_information: Optional[DrugProductInformation] = Field(None, alias="DrugProductInformation")
-    labeling_information: Optional[LabelingSection] = Field(None, alias="LabelingInformation")
-    babe_studies: Optional[BaBeStudies] = Field(None, alias="BaBeStudies")
-    sources: Optional[Union[List[Any], dict, str]] = Field(None, alias="Sources")
-    glossary: Optional[Union[List[Any], dict, str]] = Field(None, alias="Glossary")
-    appendices: Optional[Appendices] = Field(None, alias="Appendices")
+    executive_summary: Optional[Union[str, Any]] = Field(None, alias="ExecutiveSummary")
+    product_overview: Optional[Union[ProductOverview, Dict[str, Any], Any]] = Field(None, alias="ProductOverview")
+    physical_chemical_properties: Optional[Union[PhysicalChemicalProperties, Dict[str, Any], Any]] = Field(None, alias="PhysicalChemicalProperties")
+    regulatory_insights: Optional[Union[RegulatoryInsights, Dict[str, Any], Any]] = Field(None, alias="RegulatoryInsights")
+    generic_entrants: Optional[Union[GenericEntrants, Dict[str, Any], Any]] = Field(None, alias="GenericEntrants")
+    drug_substance: Optional[Union[DrugSubstance, Dict[str, Any], Any]] = Field(None, alias="DrugSubstance")
+    drug_product_information: Optional[Union[DrugProductInformation, Dict[str, Any], Any]] = Field(None, alias="DrugProductInformation")
+    labeling_information: Optional[Union[LabelingSection, List[Any], Dict[str, Any], Any]] = Field(None, alias="LabelingInformation")
+    babe_studies: Optional[Union[BaBeStudies, List[Any], Dict[str, Any], Any]] = Field(None, alias="BaBeStudies")
+    sources: Optional[Union[List[Any], Dict[str, Any], str, Any]] = Field(None, alias="Sources")
+    glossary: Optional[Union[List[Any], Dict[str, Any], str, Any]] = Field(None, alias="Glossary")
+    appendices: Optional[Union[Appendices, List[Any], Dict[str, Any], Any]] = Field(None, alias="Appendices")
+
+    @field_validator('*', mode='before')
+    @classmethod
+    def deep_robustness_validator(cls, v, info):
+        # 1. Handle empty objects
+        if isinstance(v, dict) and not v:
+            return None
+            
+        # 2. Handle wrapped strings
+        if info.field_name in ['sources', 'glossary', 'executive_summary']:
+            if isinstance(v, dict):
+                for key, val in v.items():
+                    if key.lower() == info.field_name.lower():
+                        return val
+                        
+        return v
 
 
 
@@ -66,6 +82,13 @@ def drug_helper(drug, base_url=None) -> dict:
     """Convert MongoDB _id to str and expand local image paths to full URLs"""
     drug["_id"] = str(drug["_id"])
     
+    # Ensure CID exists at top level and inside ProductOverview
+    cid_val = drug.get("cid") or (drug.get("ProductOverview") or {}).get("cid")
+    if cid_val:
+        drug["cid"] = cid_val
+        if "ProductOverview" in drug and isinstance(drug["ProductOverview"], dict):
+            drug["ProductOverview"]["cid"] = cid_val
+
     if base_url:
         def expand_urls(obj):
             if isinstance(obj, dict):
@@ -307,7 +330,27 @@ async def create_drug(request: Request, user: dict = Depends(require_roles(["edi
         else:
             drug_data["cid"] = "D001"
 
-    # 6️⃣ Save to MongoDB
+    # 6️⃣ Creator metadata & timestamps
+    user_id = str(user.get("_id") or user.get("id") or "")
+    user_email = user.get("email") or ""
+    user_name = user.get("name") or user_email
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    drug_data["createdBy"] = drug_data.get("createdBy") or user_id
+    drug_data["createdByEmail"] = drug_data.get("createdByEmail") or user_email
+    drug_data["createdByName"] = drug_data.get("createdByName") or user_name
+    drug_data["createdAt"] = drug_data.get("createdAt") or now_iso
+    drug_data["updatedAt"] = now_iso
+    drug_data["updatedBy"] = user_id
+    drug_data["updatedByEmail"] = user_email
+    drug_data["updatedByName"] = user_name
+
+    if "ProductOverview" in drug_data and isinstance(drug_data["ProductOverview"], dict):
+        drug_data["ProductOverview"]["createdBy"] = drug_data["ProductOverview"].get("createdBy") or user_id
+        drug_data["ProductOverview"]["createdByEmail"] = drug_data["ProductOverview"].get("createdByEmail") or user_email
+        drug_data["ProductOverview"]["createdByName"] = drug_data["ProductOverview"].get("createdByName") or user_name
+
+    # 7️⃣ Save to MongoDB
     print(f"[DEBUG] Saving to DB - cid: {drug_data.get('cid')}")
     inserted = await db.drugs.insert_one(drug_data)
     created_drug = await db.drugs.find_one({"_id": inserted.inserted_id})
@@ -339,6 +382,79 @@ async def create_drug(request: Request, user: dict = Depends(require_roles(["edi
     return DrugResponse(message="Drug created successfully", data=response_data)
 
 
+async def enrich_creator_info(drug_dict: dict) -> dict:
+    if not drug_dict:
+        return drug_dict
+    po = drug_dict.get("ProductOverview") if isinstance(drug_dict.get("ProductOverview"), dict) else {}
+
+    # Ensure CID is present and synchronized
+    cid_val = drug_dict.get("cid") or po.get("cid")
+    if not cid_val and drug_dict.get("_id"):
+        last = await db.drugs.find_one({"cid": {"$exists": True, "$ne": None, "$ne": ""}}, sort=[("cid", -1)])
+        if last and last.get("cid"):
+            try:
+                last_num = int(str(last["cid"]).replace("D", "").strip())
+                cid_val = f"D{last_num + 1:03d}"
+            except Exception:
+                cid_val = "D001"
+        else:
+            cid_val = "D001"
+
+        drug_dict["cid"] = cid_val
+        if "ProductOverview" in drug_dict and isinstance(drug_dict["ProductOverview"], dict):
+            drug_dict["ProductOverview"]["cid"] = cid_val
+
+        d_id = drug_dict["_id"]
+        q_filter = {"$or": [{"_id": ObjectId(d_id)}, {"_id": d_id}]} if ObjectId.is_valid(d_id) else {"_id": d_id}
+        await db.drugs.update_one(q_filter, {"$set": {"cid": cid_val, "ProductOverview.cid": cid_val}})
+    elif cid_val:
+        drug_dict["cid"] = cid_val
+        if "ProductOverview" in drug_dict and isinstance(drug_dict["ProductOverview"], dict):
+            drug_dict["ProductOverview"]["cid"] = cid_val
+
+    cb_name = drug_dict.get("createdByName") or po.get("createdByName")
+    cb_email = drug_dict.get("createdByEmail") or po.get("createdByEmail")
+    cb_id = drug_dict.get("createdBy") or po.get("createdBy") or drug_dict.get("created_by")
+
+    # If creator name is not found, attempt user lookup across multiple fields
+    if not cb_name and cb_id:
+        cb_id_str = str(cb_id).strip()
+        user_doc = None
+        if ObjectId.is_valid(cb_id_str):
+            user_doc = await db.users.find_one({"_id": ObjectId(cb_id_str)})
+        if not user_doc:
+            user_doc = await db.users.find_one({
+                "$or": [
+                    {"_id": cb_id_str},
+                    {"email": cb_id_str},
+                    {"name": cb_id_str}
+                ]
+            })
+        if user_doc:
+            cb_name = user_doc.get("name") or user_doc.get("email")
+            cb_email = cb_email or user_doc.get("email")
+        else:
+            cb_name = cb_id_str
+
+    # Fallback to updatedByName or updatedBy if createdBy is empty
+    if not cb_name:
+        up_name = drug_dict.get("updatedByName") or drug_dict.get("updatedByEmail") or drug_dict.get("updatedBy")
+        if up_name:
+            cb_name = up_name
+
+    if cb_name:
+        drug_dict["createdByName"] = cb_name
+        if "ProductOverview" in drug_dict and isinstance(drug_dict["ProductOverview"], dict):
+            drug_dict["ProductOverview"]["createdByName"] = cb_name
+
+    if cb_email:
+        drug_dict["createdByEmail"] = cb_email
+        if "ProductOverview" in drug_dict and isinstance(drug_dict["ProductOverview"], dict):
+            drug_dict["ProductOverview"]["createdByEmail"] = cb_email
+
+    return drug_dict
+
+
 # ---------------- GET ALL DRUGS ----------------
 @drug_router.get("/drugs/", response_model=DrugListResponse)
 async def get_all_drugs(request: Request, skip: int = 0,  user: dict = Depends(require_roles(["subscriber"]))):
@@ -348,6 +464,7 @@ async def get_all_drugs(request: Request, skip: int = 0,  user: dict = Depends(r
 
     async for drug in cursor:
         response_data = drug_helper(drug, base_url)
+        response_data = await enrich_creator_info(response_data)
 
         # Collect URLs from the converted data
         image_urls = []
@@ -373,19 +490,38 @@ async def get_all_drugs(request: Request, skip: int = 0,  user: dict = Depends(r
     )
 
 
+def get_drug_filter(drug_id: str) -> dict:
+    drug_id_str = str(drug_id).strip()
+    if ObjectId.is_valid(drug_id_str):
+        return {
+            "$or": [
+                {"_id": ObjectId(drug_id_str)},
+                {"_id": drug_id_str},
+                {"cid": drug_id_str},
+                {"ProductOverview.cid": drug_id_str}
+            ]
+        }
+    return {
+        "$or": [
+            {"cid": drug_id_str},
+            {"ProductOverview.cid": drug_id_str},
+            {"_id": drug_id_str}
+        ]
+    }
+
+
 # ---------------- GET SINGLE DRUG ----------------
 @drug_router.get("/drugs/{drug_id}", response_model=DrugResponse)
 @drug_router.get("/drug/{drug_id}", response_model=DrugResponse)
 async def get_drug(drug_id: str, request: Request, user: dict = Depends(require_roles(["subscriber"]))):
-    if not ObjectId.is_valid(drug_id):
-        raise HTTPException(status_code=400, detail="Invalid ID")
-
-    drug = await db.drugs.find_one({"_id": ObjectId(drug_id)})
+    query_filter = get_drug_filter(drug_id)
+    drug = await db.drugs.find_one(query_filter)
     if not drug:
         raise HTTPException(status_code=404, detail="Drug not found")
 
     base_url = str(request.base_url).rstrip("/")
     response_data = drug_helper(drug, base_url)
+    response_data = await enrich_creator_info(response_data)
 
     # Collect URLs from the converted data
     image_urls = []
@@ -412,58 +548,124 @@ async def get_drug(drug_id: str, request: Request, user: dict = Depends(require_
 @drug_router.put("/drugs/{drug_id}", response_model=DrugResponse)
 @drug_router.put("/drug/{drug_id}", response_model=DrugResponse)
 async def update_drug(drug_id: str, updated_drug: DrugUpdate, request: Request, user: dict = Depends(require_roles(["editor"]))):
-    if not ObjectId.is_valid(drug_id):
-        raise HTTPException(status_code=400, detail="Invalid ID")
+    try:
+        query_filter = get_drug_filter(drug_id)
+        existing_drug = await db.drugs.find_one(query_filter)
+        if not existing_drug:
+            raise HTTPException(status_code=404, detail="Drug not found")
 
-    existing_drug = await db.drugs.find_one({"_id": ObjectId(drug_id)})
-    if not existing_drug:
-        raise HTTPException(status_code=404, detail="Drug not found")
+        user_roles = [str(r).lower() for r in user.get("roles", [])]
+        is_admin = "admin" in user_roles
+        if not is_admin:
+            created_by = (
+                existing_drug.get("createdBy") or
+                existing_drug.get("createdByEmail") or
+                (existing_drug.get("ProductOverview") or {}).get("createdBy") or
+                (existing_drug.get("ProductOverview") or {}).get("createdByEmail")
+            )
+            user_id = str(user.get("_id") or user.get("id") or user.get("sub") or "")
+            user_email = str(user.get("email") or "").lower()
 
-    user_roles = [str(r).lower() for r in user.get("roles", [])]
-    is_admin = "admin" in user_roles
-    if not is_admin:
-        created_by = (
-            existing_drug.get("createdBy") or
-            existing_drug.get("createdByEmail") or
-            (existing_drug.get("ProductOverview") or {}).get("createdBy") or
-            (existing_drug.get("ProductOverview") or {}).get("createdByEmail")
+            if created_by:
+                cb_str = str(created_by).lower()
+                if cb_str != user_id.lower() and cb_str != user_email:
+                    raise HTTPException(status_code=403, detail="Editors can only edit drugs created by themselves")
+
+        # Build update data from provided fields
+        update_data = updated_drug.model_dump(exclude_unset=True, by_alias=True)
+
+        # Smart Image Processing for updates
+        update_data = process_base64_images(update_data)
+
+        # Remove immutable / identifier fields so MongoDB update does not fail
+        update_data.pop("_id", None)
+        update_data.pop("original_id", None)
+        update_data.pop("id", None)
+
+        # Preserve or generate CID
+        if not update_data.get("cid"):
+            if existing_drug.get("cid"):
+                update_data["cid"] = existing_drug.get("cid")
+            elif (existing_drug.get("ProductOverview") or {}).get("cid"):
+                update_data["cid"] = existing_drug["ProductOverview"]["cid"]
+            else:
+                last = await db.drugs.find_one({"cid": {"$exists": True, "$ne": None, "$ne": ""}}, sort=[("cid", -1)])
+                if last and last.get("cid"):
+                    try:
+                        last_num = int(str(last["cid"]).replace("D", "").strip())
+                        update_data["cid"] = f"D{last_num + 1:03d}"
+                    except Exception:
+                        update_data["cid"] = "D001"
+                else:
+                    update_data["cid"] = "D001"
+
+        # Update audit metadata
+        now_iso = datetime.now(timezone.utc).isoformat()
+        u_id = str(user.get("_id") or user.get("id") or user.get("sub") or "")
+        u_email = str(user.get("email") or "")
+        u_name = str(user.get("name") or u_email)
+
+        update_data["updatedAt"] = now_iso
+        update_data["updatedBy"] = u_id
+        update_data["updatedByEmail"] = u_email
+        update_data["updatedByName"] = u_name
+
+        # Preserve original creator metadata or initialize with current user if missing
+        update_data["createdBy"] = existing_drug.get("createdBy") or update_data.get("createdBy") or u_id
+        update_data["createdByEmail"] = existing_drug.get("createdByEmail") or update_data.get("createdByEmail") or u_email
+        update_data["createdByName"] = existing_drug.get("createdByName") or update_data.get("createdByName") or u_name
+        update_data["createdAt"] = existing_drug.get("createdAt") or update_data.get("createdAt") or now_iso
+
+        if "ProductOverview" in update_data and isinstance(update_data["ProductOverview"], dict):
+            update_data["ProductOverview"]["cid"] = update_data.get("cid")
+            update_data["ProductOverview"]["createdBy"] = update_data["createdBy"]
+            update_data["ProductOverview"]["createdByEmail"] = update_data["createdByEmail"]
+            update_data["ProductOverview"]["createdByName"] = update_data["createdByName"]
+
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No valid fields to update")
+
+        await db.drugs.update_one(
+            query_filter,
+            {"$set": update_data}
         )
-        user_id = str(user.get("_id") or user.get("id") or user.get("sub") or "")
-        user_email = str(user.get("email") or "").lower()
 
-        if created_by:
-            cb_str = str(created_by).lower()
-            if cb_str != user_id.lower() and cb_str != user_email:
-                raise HTTPException(status_code=403, detail="Editors can only edit drugs created by themselves")
+        updated_doc = await db.drugs.find_one(query_filter)
+        if not updated_doc:
+            raise HTTPException(status_code=404, detail="Updated drug not found")
 
-    # Build update data from provided fields
-    update_data = updated_drug.model_dump(exclude_unset=True, by_alias=True)
+        base_url = str(request.base_url).rstrip("/")
+        response_data = drug_helper(updated_doc, base_url)
+        response_data = await enrich_creator_info(response_data)
 
-    # Smart Image Processing for updates
-    update_data = process_base64_images(update_data)
+        image_urls = []
+        def collect_urls(obj):
+            if isinstance(obj, dict):
+                for v in obj.values():
+                    collect_urls(v)
+            elif isinstance(obj, list):
+                for v in obj:
+                    collect_urls(v)
+            elif isinstance(obj, str) and (obj.startswith("http") or obj.startswith("data:image") or obj.startswith("/uploads/")):
+                image_urls.append(obj)
 
-    if not update_data:
-        raise HTTPException(status_code=400, detail="No valid fields to update")
+        collect_urls(response_data)
+        response_data["image_urls"] = image_urls
 
-    result = await db.drugs.update_one(
-        {"_id": ObjectId(drug_id)},
-        {"$set": update_data}
-    )
-
-    updated_doc = await db.drugs.find_one({"_id": ObjectId(drug_id)})
-
-    base_url = str(request.base_url).rstrip("/")
-    return DrugResponse(message="Drug updated successfully", data=drug_helper(updated_doc, base_url))
+        return DrugResponse(message="Drug updated successfully", data=response_data)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Exception in update_drug: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update drug: {str(e)}")
 
 
 # ---------------- DELETE DRUG ----------------
 @drug_router.delete("/drugs/{drug_id}", response_model=MessageResponse)
 @drug_router.delete("/drug/{drug_id}", response_model=MessageResponse)
 async def delete_drug(drug_id: str, user: dict = Depends(require_roles(["editor"]))):
-    if not ObjectId.is_valid(drug_id):
-        raise HTTPException(status_code=400, detail="Invalid ID")
-
-    existing_drug = await db.drugs.find_one({"_id": ObjectId(drug_id)})
+    query_filter = get_drug_filter(drug_id)
+    existing_drug = await db.drugs.find_one(query_filter)
     if not existing_drug:
         raise HTTPException(status_code=404, detail="Drug not found")
 
@@ -484,12 +686,12 @@ async def delete_drug(drug_id: str, user: dict = Depends(require_roles(["editor"
             if cb_str != user_id.lower() and cb_str != user_email:
                 raise HTTPException(status_code=403, detail="Editors can only delete drugs created by themselves")
 
-    result = await db.drugs.delete_one({"_id": ObjectId(drug_id)})
+    result = await db.drugs.delete_one(query_filter)
 
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Drug not found")
 
-    return {"message": f"Drug with ID {drug_id} deleted successfully"}
+    return MessageResponse(message=f"Drug with ID {drug_id} deleted successfully")
 
 
 # ---------------- SEARCH HISTORY ENDPOINTS ----------------
