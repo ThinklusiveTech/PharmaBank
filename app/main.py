@@ -78,12 +78,64 @@ async def ensure_master_data():
         print(f"✅ Auto-seeded {len(REGULATORY_AUTHORITIES_DATA)} Regulatory Authorities")
 
 
+async def ensure_drug_timestamps():
+    """Ensure all existing drugs in MongoDB have valid createdAt and updatedAt fields"""
+    from app.database import db
+    from bson import ObjectId
+    from datetime import datetime, timezone
+
+    cursor = db.drugs.find({})
+    updated_count = 0
+    async for drug in cursor:
+        d_id = drug.get("_id")
+        po = drug.get("ProductOverview") if isinstance(drug.get("ProductOverview"), dict) else {}
+        
+        # Determine existing or fallback creation timestamp
+        created_at = drug.get("createdAt") or po.get("createdAt")
+        if not created_at and d_id and ObjectId.is_valid(str(d_id)):
+            created_at = ObjectId(str(d_id)).generation_time.isoformat()
+        if not created_at:
+            created_at = datetime.now(timezone.utc).isoformat()
+
+        # Determine existing or fallback update timestamp
+        updated_at = drug.get("updatedAt") or po.get("updatedAt") or created_at
+
+        # If fields are missing in document or ProductOverview, update MongoDB
+        needs_update = (
+            not drug.get("createdAt") or
+            not drug.get("updatedAt") or
+            ("ProductOverview" in drug and isinstance(drug["ProductOverview"], dict) and (
+                not drug["ProductOverview"].get("createdAt") or
+                not drug["ProductOverview"].get("updatedAt")
+            ))
+        )
+
+        if needs_update and d_id:
+            update_fields = {
+                "createdAt": created_at,
+                "updatedAt": updated_at
+            }
+            if "ProductOverview" in drug and isinstance(drug["ProductOverview"], dict):
+                update_fields["ProductOverview.createdAt"] = created_at
+                update_fields["ProductOverview.updatedAt"] = updated_at
+
+            await db.drugs.update_one(
+                {"_id": d_id},
+                {"$set": update_fields}
+            )
+            updated_count += 1
+
+    if updated_count > 0:
+        print(f"✅ Migrated timestamps for {updated_count} existing drugs in MongoDB")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup actions
     try:
         await ensure_default_users()
         await ensure_master_data()
+        await ensure_drug_timestamps()
     except Exception as e:
         print(f"⚠️ Error during startup initialization: {e}")
     yield
