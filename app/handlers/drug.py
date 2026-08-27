@@ -452,6 +452,25 @@ async def enrich_creator_info(drug_dict: dict) -> dict:
         if "ProductOverview" in drug_dict and isinstance(drug_dict["ProductOverview"], dict):
             drug_dict["ProductOverview"]["createdByEmail"] = cb_email
 
+    # Ensure createdAt and updatedAt exist for historical records
+    d_id = drug_dict.get("_id")
+    generation_time_iso = None
+    if d_id and ObjectId.is_valid(str(d_id)):
+        generation_time_iso = ObjectId(str(d_id)).generation_time.isoformat()
+
+    created_at = drug_dict.get("createdAt") or po.get("createdAt") or generation_time_iso
+    updated_at = drug_dict.get("updatedAt") or po.get("updatedAt") or created_at
+
+    if created_at:
+        drug_dict["createdAt"] = created_at
+        if "ProductOverview" in drug_dict and isinstance(drug_dict["ProductOverview"], dict):
+            drug_dict["ProductOverview"]["createdAt"] = created_at
+
+    if updated_at:
+        drug_dict["updatedAt"] = updated_at
+        if "ProductOverview" in drug_dict and isinstance(drug_dict["ProductOverview"], dict):
+            drug_dict["ProductOverview"]["updatedAt"] = updated_at
+
     return drug_dict
 
 
