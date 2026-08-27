@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
-from typing import List, Optional, Union, Any
+from typing import List, Optional, Union, Any, Dict
 from datetime import datetime
 import calendar
 
@@ -132,7 +132,7 @@ class PhysicalChemicalProperties(BaseModel):
     pka: Optional[str] = None
     logp: Optional[str] = None
     logd: Optional[str] = None
-    individualSolvent: Optional[List[IndividualSolvent]] = []
+    individualSolvent: Optional[Union[List[IndividualSolvent], List[Any], str]] = []
 
     @field_validator('structure', mode='before')
     @classmethod
@@ -190,10 +190,10 @@ class RegulatoryAdditionalInfo(BaseModel):
 class RegulatoryInsights(BaseModel):
     regulatoryInsights: Optional[str] = None
     regionalApproval: Optional[str] = None
-    approvalDetails: Optional[List[RegulatoryApprovalDetail]] = []
-    specialDesignations: Optional[List[SpecialDesignation]] = []
-    drugPatents: Optional[List[DrugPatent]] = []
-    additionalInfo: Optional[List[RegulatoryAdditionalInfo]] = []
+    approvalDetails: Optional[Union[List[RegulatoryApprovalDetail], List[Any], str]] = []
+    specialDesignations: Optional[Union[List[SpecialDesignation], List[Any], str]] = []
+    drugPatents: Optional[Union[List[DrugPatent], List[Any], str]] = []
+    additionalInfo: Optional[Union[List[RegulatoryAdditionalInfo], List[Any], str]] = []
 
 
 # ==================== Step 4: Generic Entrants ====================
@@ -228,8 +228,8 @@ class GenericApprovedByEma(BaseModel):
 
 
 class GenericEntrants(BaseModel):
-    genericEntrants: Optional[List[GenericEntrant]] = []
-    genericsApprovedByEma: Optional[List[GenericApprovedByEma]] = []
+    genericEntrants: Optional[Union[List[GenericEntrant], List[Any], str]] = []
+    genericsApprovedByEma: Optional[Union[List[GenericApprovedByEma], List[Any], str]] = []
 
 
 # ==================== Step 5: Drug Substance (formerly Process Development) ====================
@@ -271,10 +271,10 @@ class GenotoxicImpurity(BaseModel):
 
 
 class DrugSubstance(BaseModel):
-    availableDmfVendors: Optional[List[AvailableDmfVendor]] = []
-    manufacturingRoutes: Optional[List[ManufacturingRoute]] = []
-    dsImpurities: Optional[List[DsImpurity]] = []
-    genotoxicImpurities: Optional[List[GenotoxicImpurity]] = []
+    availableDmfVendors: Optional[Union[List[AvailableDmfVendor], List[Any], str]] = []
+    manufacturingRoutes: Optional[Union[List[ManufacturingRoute], List[Any], str]] = []
+    dsImpurities: Optional[Union[List[DsImpurity], List[Any], str]] = []
+    genotoxicImpurities: Optional[Union[List[GenotoxicImpurity], List[Any], str]] = []
     stability: Optional[Union[List[Any], str]] = []
     nitrosaminesAssessment: Optional[str] = None
     otherInformation: Optional[str] = None
@@ -351,12 +351,12 @@ class Pharmacokinetics(BaseModel):
 
 
 class DrugProductInformation(BaseModel):
-    dosageFormAndStrength: Optional[List[DosageFormAndStrength]] = []
-    supplyChain: Optional[List[SupplyChainItem]] = []
-    shelfLife: Optional[List[ShelfLife]] = []
-    manufacturingProcess: Optional[List[ManufacturingProcess]] = []
-    dissolutionStudies: Optional[List[DissolutionStudy]] = []
-    pharmacokinetics: Optional[List[Pharmacokinetics]] = []
+    dosageFormAndStrength: Optional[Union[List[DosageFormAndStrength], List[Any], str]] = []
+    supplyChain: Optional[Union[List[SupplyChainItem], List[Any], str]] = []
+    shelfLife: Optional[Union[List[ShelfLife], List[Any], str]] = []
+    manufacturingProcess: Optional[Union[List[ManufacturingProcess], List[Any], str]] = []
+    dissolutionStudies: Optional[Union[List[DissolutionStudy], List[Any], str]] = []
+    pharmacokinetics: Optional[Union[List[Pharmacokinetics], List[Any], str]] = []
     formulationChallenges: Optional[str] = None
     stabilityStudies: Optional[Union[List[Any], str]] = []
     maximumDailyDose: Optional[str] = None
@@ -379,7 +379,7 @@ class LabelingInformationItem(BaseModel):
 
 
 class LabelingSection(BaseModel):
-    labelingInformation: Optional[List[LabelingInformationItem]] = []
+    labelingInformation: Optional[Union[List[LabelingInformationItem], List[Any], str]] = []
 
     @field_validator('labelingInformation', mode='before')
     @classmethod
@@ -410,7 +410,7 @@ class BaBeStudy(BaseModel):
 
 
 class BaBeStudies(BaseModel):
-    baBeStudies: Optional[List[BaBeStudy]] = []
+    baBeStudies: Optional[Union[List[BaBeStudy], List[Any], str]] = []
     biowaiverRequest: Optional[str] = None
     dissolutionTestMethodAndSamplingTimes: Optional[str] = None
 
@@ -421,7 +421,7 @@ class AppendixItem(BaseModel):
 
 
 class Appendices(BaseModel):
-    appendices: Optional[List[AppendixItem]] = []
+    appendices: Optional[Union[List[AppendixItem], List[Any], str]] = []
 
 
 # ==================== Main Drug Data Model ====================
@@ -434,18 +434,18 @@ class NewDrugData(BaseModel):
     created_by: Optional[str] = Field(None, alias="createdBy")
     created_by_email: Optional[str] = Field(None, alias="createdByEmail")
     created_by_name: Optional[str] = Field(None, alias="createdByName")
-    executive_summary: Optional[str] = Field(None, alias="ExecutiveSummary")
-    product_overview: Optional[ProductOverview] = Field(None, alias="ProductOverview")
-    physical_chemical_properties: Optional[PhysicalChemicalProperties] = Field(None, alias="PhysicalChemicalProperties")
-    regulatory_insights: Optional[RegulatoryInsights] = Field(None, alias="RegulatoryInsights")
-    generic_entrants: Optional[GenericEntrants] = Field(None, alias="GenericEntrants")
-    drug_substance: Optional[DrugSubstance] = Field(None, alias="DrugSubstance")
-    drug_product_information: Optional[DrugProductInformation] = Field(None, alias="DrugProductInformation")
-    labeling_information: Optional[LabelingSection] = Field(None, alias="LabelingInformation")
-    babe_studies: Optional[BaBeStudies] = Field(None, alias="BaBeStudies")
-    sources: Optional[Union[List[Any], dict, str]] = Field(None, alias="Sources")
-    glossary: Optional[Union[List[Any], dict, str]] = Field(None, alias="Glossary")
-    appendices: Optional[Appendices] = Field(None, alias="Appendices")
+    executive_summary: Optional[Union[str, Any]] = Field(None, alias="ExecutiveSummary")
+    product_overview: Optional[Union[ProductOverview, Dict[str, Any], Any]] = Field(None, alias="ProductOverview")
+    physical_chemical_properties: Optional[Union[PhysicalChemicalProperties, Dict[str, Any], Any]] = Field(None, alias="PhysicalChemicalProperties")
+    regulatory_insights: Optional[Union[RegulatoryInsights, Dict[str, Any], Any]] = Field(None, alias="RegulatoryInsights")
+    generic_entrants: Optional[Union[GenericEntrants, Dict[str, Any], Any]] = Field(None, alias="GenericEntrants")
+    drug_substance: Optional[Union[DrugSubstance, Dict[str, Any], Any]] = Field(None, alias="DrugSubstance")
+    drug_product_information: Optional[Union[DrugProductInformation, Dict[str, Any], Any]] = Field(None, alias="DrugProductInformation")
+    labeling_information: Optional[Union[LabelingSection, List[Any], Dict[str, Any], Any]] = Field(None, alias="LabelingInformation")
+    babe_studies: Optional[Union[BaBeStudies, List[Any], Dict[str, Any], Any]] = Field(None, alias="BaBeStudies")
+    sources: Optional[Union[List[Any], Dict[str, Any], str, Any]] = Field(None, alias="Sources")
+    glossary: Optional[Union[List[Any], Dict[str, Any], str, Any]] = Field(None, alias="Glossary")
+    appendices: Optional[Union[Appendices, List[Any], Dict[str, Any], Any]] = Field(None, alias="Appendices")
 
     @field_validator('*', mode='before')
     @classmethod
