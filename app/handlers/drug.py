@@ -356,6 +356,30 @@ async def create_drug(request: Request, user: dict = Depends(require_roles(["edi
     created_drug = await db.drugs.find_one({"_id": inserted.inserted_id})
     print(f"[DEBUG] Retrieved from DB - _id: {created_drug.get('_id')}")
 
+    # Automatically clean up any drafts for this newly published drug
+    try:
+        new_drug_name = created_drug.get("drugName") or (created_drug.get("ProductOverview") or {}).get("drugName")
+        new_doc_cid = created_drug.get("cid")
+        new_id_str = str(created_drug.get("_id"))
+        draft_del_conditions = [
+            {"formData._id": new_id_str},
+            {"formData.id": new_id_str},
+            {"formData.original_id": new_id_str}
+        ]
+        if new_doc_cid:
+            draft_del_conditions.extend([
+                {"formData.cid": str(new_doc_cid)},
+                {"formData.ProductOverview.cid": str(new_doc_cid)}
+            ])
+        if new_drug_name:
+            draft_del_conditions.extend([
+                {"drugName": {"$regex": f"^{new_drug_name}$", "$options": "i"}},
+                {"formData.drugName": {"$regex": f"^{new_drug_name}$", "$options": "i"}}
+            ])
+        await db.drafts.delete_many({"$or": draft_del_conditions})
+    except Exception as del_e:
+        print(f"[WARN] Failed to clean up drafts on create: {del_e}")
+
     base_url = str(request.base_url).rstrip("/")
     response_data = drug_helper(created_drug, base_url)
     print(f"[DEBUG] After drug_helper - appendices field: {response_data.get('appendices')}")
@@ -652,6 +676,30 @@ async def update_drug(drug_id: str, updated_drug: DrugUpdate, request: Request, 
         updated_doc = await db.drugs.find_one(query_filter)
         if not updated_doc:
             raise HTTPException(status_code=404, detail="Updated drug not found")
+
+        # Automatically clean up any existing drafts for this updated published drug
+        try:
+            up_drug_name = updated_doc.get("drugName") or (updated_doc.get("ProductOverview") or {}).get("drugName")
+            up_doc_cid = updated_doc.get("cid")
+            up_id_str = str(updated_doc.get("_id"))
+            up_draft_del_conditions = [
+                {"formData._id": up_id_str},
+                {"formData.id": up_id_str},
+                {"formData.original_id": up_id_str}
+            ]
+            if up_doc_cid:
+                up_draft_del_conditions.extend([
+                    {"formData.cid": str(up_doc_cid)},
+                    {"formData.ProductOverview.cid": str(up_doc_cid)}
+                ])
+            if up_drug_name:
+                up_draft_del_conditions.extend([
+                    {"drugName": {"$regex": f"^{up_drug_name}$", "$options": "i"}},
+                    {"formData.drugName": {"$regex": f"^{up_drug_name}$", "$options": "i"}}
+                ])
+            await db.drafts.delete_many({"$or": up_draft_del_conditions})
+        except Exception as del_e:
+            print(f"[WARN] Failed to clean up drafts on update: {del_e}")
 
         base_url = str(request.base_url).rstrip("/")
         response_data = drug_helper(updated_doc, base_url)
