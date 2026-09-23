@@ -89,6 +89,8 @@ class LossOfExclusivityItem(BaseModel):
 
 # ==================== Step 1: Product Overview ====================
 class ProductOverview(BaseModel):
+    model_config = ConfigDict(extra='allow')
+
     version: Optional[str] = None
     drugName: Optional[str] = None
     apiName: Optional[str] = None
@@ -98,14 +100,22 @@ class ProductOverview(BaseModel):
     approvedIndications: Optional[str] = None
     firstApprovedDate: Optional[Union[int, str]] = None
     firstApprovedRegion: Optional[str] = None
-    dosageForms: Optional[str] = None
+    dosageForms: Optional[Union[str, List[Any], Dict[str, Any]]] = None
+    dosageFormAndStrength: Optional[Union[List[Any], Dict[str, Any], str]] = None
+    dosageFormsAndStrengths: Optional[Union[List[Any], Dict[str, Any], str]] = None
     lossOfExclusivity: Optional[Union[List[LossOfExclusivityItem], List[Any], str]] = None
-    globalAnnualRevenue: Optional[str] = None
+    lossOfExclusivityDate: Optional[Union[int, str]] = None
+    expiredDate: Optional[Union[int, str]] = None
+    timeFromLoeToFirstGenericLaunchMonths: Optional[Union[int, float, str]] = None
+    timeFromLoeToFirstGenericLaunch: Optional[Union[int, float, str]] = None
+    globalAnnualRevenue: Optional[Union[List[Any], Dict[str, Any], str]] = None
+    marketingRights: Optional[Union[List[Any], Dict[str, Any], str]] = None
+    marketingDistributionRights: Optional[Union[List[Any], Dict[str, Any], str]] = None
     createdBy: Optional[str] = None
     createdByEmail: Optional[str] = None
     createdByName: Optional[str] = None
 
-    @field_validator('firstApprovedDate', mode='before')
+    @field_validator('firstApprovedDate', 'firstApprovedDate', 'lossOfExclusivityDate', 'expiredDate', mode='before')
     @classmethod
     def validate_dates(cls, v):
         return handle_date_field(v)
@@ -185,6 +195,20 @@ class DrugPatent(BaseModel):
 class RegulatoryAdditionalInfo(BaseModel):
     consideration: Optional[str] = None
     impactForGenericFilers: Optional[str] = None
+
+
+# ==================== Step 3: Development Feasibility & Timeline ====================
+class DevelopmentFeasibility(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    recommendedRegulatoryPathway: Optional[str] = None
+    overallCmcComplexityRating: Optional[str] = None
+    estimatedDsDevelopmentTimelineMonths: Optional[Union[float, int, str]] = None
+    estimatedDpDevelopmentTimelineMonths: Optional[Union[float, int, str]] = None
+    estimatedTotalTimeToFilingMonths: Optional[Union[float, int, str]] = None
+    keyDevelopmentRiskFlags: Optional[str] = None
+    firstToFile180DayExclusivityOpportunity: Optional[str] = None
+    therapeuticEquivalenceTeCode: Optional[str] = None
+    bdRecommendation: Optional[str] = None
 
 
 class RegulatoryInsights(BaseModel):
@@ -436,6 +460,7 @@ class NewDrugData(BaseModel):
     created_by_name: Optional[str] = Field(None, alias="createdByName")
     executive_summary: Optional[Union[str, Any]] = Field(None, alias="ExecutiveSummary")
     product_overview: Optional[Union[ProductOverview, Dict[str, Any], Any]] = Field(None, alias="ProductOverview")
+    development_feasibility: Optional[Union[DevelopmentFeasibility, Dict[str, Any], Any]] = Field(None, alias="DevelopmentFeasibility")
     physical_chemical_properties: Optional[Union[PhysicalChemicalProperties, Dict[str, Any], Any]] = Field(None, alias="PhysicalChemicalProperties")
     regulatory_insights: Optional[Union[RegulatoryInsights, Dict[str, Any], Any]] = Field(None, alias="RegulatoryInsights")
     generic_entrants: Optional[Union[GenericEntrants, Dict[str, Any], Any]] = Field(None, alias="GenericEntrants")
