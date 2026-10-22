@@ -89,6 +89,8 @@ class LossOfExclusivityItem(BaseModel):
 
 # ==================== Step 1: Product Overview ====================
 class ProductOverview(BaseModel):
+    model_config = ConfigDict(extra='allow')
+
     version: Optional[str] = None
     drugName: Optional[str] = None
     apiName: Optional[str] = None
@@ -98,14 +100,22 @@ class ProductOverview(BaseModel):
     approvedIndications: Optional[str] = None
     firstApprovedDate: Optional[Union[int, str]] = None
     firstApprovedRegion: Optional[str] = None
-    dosageForms: Optional[str] = None
+    dosageForms: Optional[Union[str, List[Any], Dict[str, Any]]] = None
+    dosageFormAndStrength: Optional[Union[List[Any], Dict[str, Any], str]] = None
+    dosageFormsAndStrengths: Optional[Union[List[Any], Dict[str, Any], str]] = None
     lossOfExclusivity: Optional[Union[List[LossOfExclusivityItem], List[Any], str]] = None
-    globalAnnualRevenue: Optional[str] = None
+    lossOfExclusivityDate: Optional[Union[int, str]] = None
+    expiredDate: Optional[Union[int, str]] = None
+    timeFromLoeToFirstGenericLaunchMonths: Optional[Union[int, float, str]] = None
+    timeFromLoeToFirstGenericLaunch: Optional[Union[int, float, str]] = None
+    globalAnnualRevenue: Optional[Union[List[Any], Dict[str, Any], str]] = None
+    marketingRights: Optional[Union[List[Any], Dict[str, Any], str]] = None
+    marketingDistributionRights: Optional[Union[List[Any], Dict[str, Any], str]] = None
     createdBy: Optional[str] = None
     createdByEmail: Optional[str] = None
     createdByName: Optional[str] = None
 
-    @field_validator('firstApprovedDate', mode='before')
+    @field_validator('firstApprovedDate', 'firstApprovedDate', 'lossOfExclusivityDate', 'expiredDate', mode='before')
     @classmethod
     def validate_dates(cls, v):
         return handle_date_field(v)
@@ -117,7 +127,16 @@ class IndividualSolvent(BaseModel):
     solubility: Optional[str] = None
 
 
+class AqueousSolubilityItem(BaseModel):
+    ph: Optional[str] = None
+    solvent: Optional[str] = None
+    solubility: Optional[str] = None
+    units: Optional[str] = None
+
+
 class PhysicalChemicalProperties(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     innName: Optional[str] = None
     synonyms: Optional[str] = None
     iupacName: Optional[str] = None
@@ -129,9 +148,15 @@ class PhysicalChemicalProperties(BaseModel):
     structure: Optional[Union[ImageObject, str]] = None
     stereochemistry: Optional[str] = None
     solubility: Optional[str] = None
+    aqueousSolubility: Optional[Union[List[AqueousSolubilityItem], List[Any], str]] = []
     pka: Optional[str] = None
     logp: Optional[str] = None
     logd: Optional[str] = None
+    compendialStatus: Optional[str] = None
+    referenceStandard: Optional[str] = None
+    hygroscopicity: Optional[str] = None
+    photostability: Optional[str] = None
+    particleSizeDistribution: Optional[str] = None
     individualSolvent: Optional[Union[List[IndividualSolvent], List[Any], str]] = []
 
     @field_validator('structure', mode='before')
@@ -143,6 +168,8 @@ class PhysicalChemicalProperties(BaseModel):
 
 
 class RegulatoryApprovalDetail(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     drugName: Optional[str] = None
     region: Optional[str] = None
     country: Optional[str] = None
@@ -160,20 +187,29 @@ class RegulatoryApprovalDetail(BaseModel):
 
 
 class SpecialDesignation(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     designationType: Optional[str] = None
     country: Optional[str] = None
     regulatorBody: Optional[str] = None
     indication: Optional[str] = None
     dateGranted: Optional[Union[int, str]] = None
+    expiryDate: Optional[Union[int, str]] = None
+    withdrawn: Optional[Union[int, str]] = None
 
-    @field_validator('dateGranted', mode='before')
+    @field_validator('dateGranted', 'expiryDate', 'withdrawn', mode='before')
     @classmethod
     def validate_date(cls, v):
         return handle_date_field(v)
 
 
-class DrugPatent(BaseModel):
+class ExclusivityInfoItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     designationType: Optional[str] = None
+    exclusivityCode: Optional[str] = None
+    regulatoryBody: Optional[str] = None
+    country: Optional[str] = None
     expiryDate: Optional[Union[int, str]] = None
 
     @field_validator('expiryDate', mode='before')
@@ -182,22 +218,80 @@ class DrugPatent(BaseModel):
         return handle_date_field(v)
 
 
+class PatentInformationItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    patentNo: Optional[str] = None
+    patentExpiration: Optional[Union[int, str]] = None
+    drugSubstance: Optional[str] = None
+    drugProduct: Optional[str] = None
+    submissionDate: Optional[Union[int, str]] = None
+    regulatoryBody: Optional[str] = None
+    designationType: Optional[str] = None
+    expiryDate: Optional[Union[int, str]] = None
+
+    @field_validator('patentExpiration', 'submissionDate', 'expiryDate', mode='before')
+    @classmethod
+    def validate_date(cls, v):
+        return handle_date_field(v)
+
+
+class DrugPatent(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    patentNo: Optional[str] = None
+    patentExpiration: Optional[Union[int, str]] = None
+    drugSubstance: Optional[str] = None
+    drugProduct: Optional[str] = None
+    submissionDate: Optional[Union[int, str]] = None
+    regulatoryBody: Optional[str] = None
+    designationType: Optional[str] = None
+    expiryDate: Optional[Union[int, str]] = None
+
+    @field_validator('patentExpiration', 'submissionDate', 'expiryDate', mode='before')
+    @classmethod
+    def validate_date(cls, v):
+        return handle_date_field(v)
+
+
 class RegulatoryAdditionalInfo(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     consideration: Optional[str] = None
     impactForGenericFilers: Optional[str] = None
 
 
+# ==================== Step 3: Development Feasibility & Timeline ====================
+class DevelopmentFeasibility(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    recommendedRegulatoryPathway: Optional[str] = None
+    overallCmcComplexityRating: Optional[str] = None
+    estimatedDsDevelopmentTimelineMonths: Optional[Union[float, int, str]] = None
+    estimatedDpDevelopmentTimelineMonths: Optional[Union[float, int, str]] = None
+    estimatedTotalTimeToFilingMonths: Optional[Union[float, int, str]] = None
+    keyDevelopmentRiskFlags: Optional[str] = None
+    firstToFile180DayExclusivityOpportunity: Optional[str] = None
+    therapeuticEquivalenceTeCode: Optional[str] = None
+    bdRecommendation: Optional[str] = None
+
+
 class RegulatoryInsights(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     regulatoryInsights: Optional[str] = None
     regionalApproval: Optional[str] = None
     approvalDetails: Optional[Union[List[RegulatoryApprovalDetail], List[Any], str]] = []
     specialDesignations: Optional[Union[List[SpecialDesignation], List[Any], str]] = []
-    drugPatents: Optional[Union[List[DrugPatent], List[Any], str]] = []
+    exclusivityInfo: Optional[Union[List[ExclusivityInfoItem], List[Any], str]] = []
+    patentInformation: Optional[Union[List[PatentInformationItem], List[Any], str]] = []
+    drugPatents: Optional[Union[List[PatentInformationItem], List[DrugPatent], List[Any], str]] = []
     additionalInfo: Optional[Union[List[RegulatoryAdditionalInfo], List[Any], str]] = []
 
 
 # ==================== Step 4: Generic Entrants ====================
 class GenericEntrant(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     anda: Optional[str] = None
     companyName: Optional[str] = None
     dosageDetails: Optional[str] = None
@@ -214,6 +308,8 @@ class GenericEntrant(BaseModel):
 
 
 class GenericApprovedByEma(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     companyName: Optional[str] = None
     drugName: Optional[str] = None
     dosageDetails: Optional[str] = None
@@ -228,15 +324,22 @@ class GenericApprovedByEma(BaseModel):
 
 
 class GenericEntrants(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     genericEntrants: Optional[Union[List[GenericEntrant], List[Any], str]] = []
     genericsApprovedByEma: Optional[Union[List[GenericApprovedByEma], List[Any], str]] = []
 
 
 # ==================== Step 5: Drug Substance (formerly Process Development) ====================
 class AvailableDmfVendor(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     dmf: Optional[str] = None
-    regulatoryBody: Optional[str] = None
+    company: Optional[str] = None
+    typeOfDmf: Optional[str] = None
+    yearApproved: Optional[Union[int, str]] = None
     status: Optional[str] = None
+    regulatoryBody: Optional[str] = None
     type: Optional[str] = None
     submissionDate: Optional[Union[int, str]] = None
     holder: Optional[str] = None
@@ -248,16 +351,48 @@ class AvailableDmfVendor(BaseModel):
         return handle_date_field(v)
 
 
+class KsmAvailabilityItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    rsmName: Optional[str] = None
+    supplier: Optional[str] = None
+
+
 class ManufacturingRoute(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     step: Optional[str] = None
+    description: Optional[str] = None
+    schematicRepresentation: Optional[Union[ImageObject, str]] = None
+
+    @field_validator('schematicRepresentation', mode='before')
+    @classmethod
+    def handle_schematic_image(cls, v):
+        if isinstance(v, list) and len(v) > 0:
+            return v[0]
+        return v
+
+
+class DrugSubstanceSpecificationItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    testCriteria: Optional[str] = None
+    acceptanceCriteria: Optional[str] = None
+    key: Optional[str] = None
+    value: Optional[str] = None
 
 
 class DsImpurity(BaseModel):
-    nameOfImpurities: Optional[str] = None
-    specifiedUnspecifiedImpurities: Optional[str] = None
-    image: Optional[Union[ImageObject, str]] = None
+    model_config = ConfigDict(extra="allow")
 
-    @field_validator('image', mode='before')
+    name: Optional[str] = None
+    nameOfImpurities: Optional[str] = None
+    structure: Optional[Union[ImageObject, str]] = None
+    image: Optional[Union[ImageObject, str]] = None
+    knownUnknown: Optional[str] = None
+    specifiedUnspecifiedImpurities: Optional[str] = None
+
+    @field_validator('structure', 'image', mode='before')
     @classmethod
     def handle_list_image(cls, v):
         if isinstance(v, list) and len(v) > 0:
@@ -265,26 +400,151 @@ class DsImpurity(BaseModel):
         return v
 
 
+class ForcedDegradationStudyItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    stressCondition: Optional[str] = None
+    details: Optional[str] = None
+    percentAssay: Optional[str] = None
+    percentImpurities: Optional[str] = None
+
+
 class GenotoxicImpurity(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    name: Optional[str] = None
     genotoxicImpurities: Optional[str] = None
+    gtiClass: Optional[str] = None
     classOfImpurity: Optional[str] = None
 
 
+class NitrosaminesAssessmentItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    nameOfImpurity: Optional[str] = None
+    structure: Optional[Union[ImageObject, str]] = None
+    riskOutcome: Optional[str] = None
+
+    @field_validator('structure', mode='before')
+    @classmethod
+    def handle_structure_image(cls, v):
+        if isinstance(v, list) and len(v) > 0:
+            return v[0]
+        return v
+
+
+class StabilityDataItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    condition: Optional[str] = None
+    durationMonths: Optional[Union[int, str]] = None
+
+
 class DrugSubstance(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     availableDmfVendors: Optional[Union[List[AvailableDmfVendor], List[Any], str]] = []
+    ksmAvailability: Optional[Union[List[KsmAvailabilityItem], List[Any], str]] = []
     manufacturingRoutes: Optional[Union[List[ManufacturingRoute], List[Any], str]] = []
-    dsImpurities: Optional[Union[List[DsImpurity], List[Any], str]] = []
-    genotoxicImpurities: Optional[Union[List[GenotoxicImpurity], List[Any], str]] = []
-    stability: Optional[Union[List[Any], str]] = []
-    nitrosaminesAssessment: Optional[str] = None
-    otherInformation: Optional[str] = None
-    regulatoryStartingMaterials: Optional[str] = None
-    drugSubstanceSpecifications: Optional[Union[List[Any], dict, str]] = None
     stableAndCommerciallyUsedPolymorphicForm: Optional[str] = None
+    drugSubstanceSpecifications: Optional[Union[List[DrugSubstanceSpecificationItem], List[Any], dict, str]] = None
+    dsImpurities: Optional[Union[List[DsImpurity], List[Any], str]] = []
+    forcedDegradationStudies: Optional[Union[List[ForcedDegradationStudyItem], List[Any], str]] = []
+    genotoxicImpurities: Optional[Union[List[GenotoxicImpurity], List[Any], str]] = []
+    nitrosaminesAssessment: Optional[Union[List[NitrosaminesAssessmentItem], List[Any], str]] = []
+    recommendedStorageCondition: Optional[str] = None
+    stabilityData: Optional[Union[List[StabilityDataItem], List[Any], str]] = []
+    stability: Optional[Union[List[Any], str]] = []
+    packaging: Optional[str] = None
+    otherInformation: Optional[str] = None
+    regulatoryStartingMaterials: Optional[Union[str, List[Any]]] = None
 
 
 # ==================== Step 6: Drug Product Information ====================
+class PresentationItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    strength: Optional[str] = None
+    dosageForm: Optional[str] = None
+    shape: Optional[str] = None
+    size: Optional[str] = None
+    color: Optional[str] = None
+    imprint: Optional[str] = None
+    ndcCode: Optional[str] = None
+
+
+class ContainerClosureSystemItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    component: Optional[str] = None
+    material: Optional[str] = None
+    function: Optional[str] = None
+
+
+class ExcipientsComplianceItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    excipient: Optional[str] = None
+    proposedLevel: Optional[str] = None
+    fdaIidMaxLevel: Optional[str] = None
+    status: Optional[str] = None
+
+
+class ManufacturingProcessItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    step: Optional[str] = None
+    description: Optional[str] = None
+    dsImpurities: Optional[str] = None
+    knownImpurities: Optional[str] = None
+    specifiedImpurities: Optional[str] = None
+    unknownImpurities: Optional[str] = None
+
+
+class DrugProductSpecificationItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    testCriteria: Optional[str] = None
+    methodTechnique: Optional[str] = None
+    acceptanceCriteria: Optional[str] = None
+
+
+class DpImpurityItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    name: Optional[str] = None
+    structure: Optional[Union[ImageObject, str]] = None
+    knownUnknown: Optional[str] = None
+
+    @field_validator('structure', mode='before')
+    @classmethod
+    def handle_structure_image(cls, v):
+        if isinstance(v, list) and len(v) > 0:
+            return v[0]
+        return v
+
+
+class StabilityStudyItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    condition: Optional[str] = None
+    durationMonths: Optional[Union[int, str]] = None
+    packaging: Optional[str] = None
+
+
+class DissolutionMethodItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    apparatus: Optional[str] = None
+    media: Optional[str] = None
+    speedRpm: Optional[str] = None
+    samplingTimes: Optional[str] = None
+    temperature: Optional[str] = None
+
+
 class DosageFormAndStrength(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     strength: Optional[str] = None
     dosageForm: Optional[str] = None
     size: Optional[str] = None
@@ -305,6 +565,8 @@ class DosageFormAndStrength(BaseModel):
 
 
 class SupplyChainItem(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     apiManufacturingAndAnalysis: Optional[str] = None
     company: Optional[str] = None
     location: Optional[str] = None
@@ -313,6 +575,8 @@ class SupplyChainItem(BaseModel):
 
 
 class ShelfLife(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     currentExpirationDate: Optional[Union[int, str]] = None
     strength: Optional[str] = None
     expiryDate: Optional[Union[int, str]] = None
@@ -323,14 +587,9 @@ class ShelfLife(BaseModel):
         return handle_date_field(v)
 
 
-class ManufacturingProcess(BaseModel):
-    dsImpurities: Optional[str] = None
-    knownImpurities: Optional[str] = None
-    specifiedImpurities: Optional[str] = None
-    unknownImpurities: Optional[str] = None
-
-
 class DissolutionStudy(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     studyType: Optional[str] = None
     uspApparatus: Optional[str] = None
     rotationSpeed: Optional[str] = None
@@ -340,6 +599,8 @@ class DissolutionStudy(BaseModel):
 
 
 class Pharmacokinetics(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     absorption: Optional[str] = None
     volumeOfDistribution: Optional[str] = None
     metabolism: Optional[str] = None
@@ -351,17 +612,29 @@ class Pharmacokinetics(BaseModel):
 
 
 class DrugProductInformation(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    presentation: Optional[Union[List[PresentationItem], List[Any], str]] = []
+    containerClosureSystem: Optional[Union[List[ContainerClosureSystemItem], List[Any], str]] = []
+    excipientsCompliance: Optional[Union[List[ExcipientsComplianceItem], List[Any], str]] = []
+    manufacturingTechnology: Optional[str] = None
+    manufacturingProcess: Optional[Union[List[ManufacturingProcessItem], List[Any], str]] = []
+    maximumDailyDose: Optional[str] = None
+    storageAndShippingConditions: Optional[str] = None
+    drugProductSpecifications: Optional[Union[List[DrugProductSpecificationItem], List[Any], str]] = []
+    dpImpurities: Optional[Union[List[DpImpurityItem], List[Any], str]] = []
+    nitrosamineStatement: Optional[str] = None
+    stabilityStudies: Optional[Union[List[StabilityStudyItem], List[Any], str]] = []
+    dissolutionMethod: Optional[Union[List[DissolutionMethodItem], List[Any], str]] = []
+
+    # Backward compatible fields
     dosageFormAndStrength: Optional[Union[List[DosageFormAndStrength], List[Any], str]] = []
     supplyChain: Optional[Union[List[SupplyChainItem], List[Any], str]] = []
     shelfLife: Optional[Union[List[ShelfLife], List[Any], str]] = []
-    manufacturingProcess: Optional[Union[List[ManufacturingProcess], List[Any], str]] = []
     dissolutionStudies: Optional[Union[List[DissolutionStudy], List[Any], str]] = []
     pharmacokinetics: Optional[Union[List[Pharmacokinetics], List[Any], str]] = []
     formulationChallenges: Optional[str] = None
-    stabilityStudies: Optional[Union[List[Any], str]] = []
-    maximumDailyDose: Optional[str] = None
     excipientsGrade: Optional[str] = None
-    storageAndShippingConditions: Optional[str] = None
     unmetClinicalNeed: Optional[str] = None
 
 
@@ -436,6 +709,7 @@ class NewDrugData(BaseModel):
     created_by_name: Optional[str] = Field(None, alias="createdByName")
     executive_summary: Optional[Union[str, Any]] = Field(None, alias="ExecutiveSummary")
     product_overview: Optional[Union[ProductOverview, Dict[str, Any], Any]] = Field(None, alias="ProductOverview")
+    development_feasibility: Optional[Union[DevelopmentFeasibility, Dict[str, Any], Any]] = Field(None, alias="DevelopmentFeasibility")
     physical_chemical_properties: Optional[Union[PhysicalChemicalProperties, Dict[str, Any], Any]] = Field(None, alias="PhysicalChemicalProperties")
     regulatory_insights: Optional[Union[RegulatoryInsights, Dict[str, Any], Any]] = Field(None, alias="RegulatoryInsights")
     generic_entrants: Optional[Union[GenericEntrants, Dict[str, Any], Any]] = Field(None, alias="GenericEntrants")

@@ -4,6 +4,7 @@ from app.database import db
 from app.jwt_handler import get_current_user, require_roles
 from pydantic import BaseModel, ConfigDict
 from typing import Dict, List, Any
+from app.handlers.drug import enrich_creator_info
 
 bookmark_router = APIRouter()
 
@@ -71,7 +72,9 @@ async def get_bookmarked_drugs(skip: int = 0, limit: int = 10, user: dict = Depe
     async for bookmark in cursor:
         drug = await db.drugs.find_one({"_id": ObjectId(bookmark["drug_id"])})
         if drug:
-            bookmarks.append(drug_helper(drug))
+            drug_data = drug_helper(drug)
+            drug_data = await enrich_creator_info(drug_data)
+            bookmarks.append(drug_data)
     return BookmarkListResponse(message="Bookmarked drugs retrieved successfully", total_bookmarks=len(bookmarks), data=bookmarks) 
 
 @bookmark_router.delete("/bookmarks/{drug_id}", response_model=MessageResponse)
